@@ -67,7 +67,7 @@ go test -bench=. -benchmem ./bloom/
 | Type | Add | Contains | Remove | Notes |
 |------|-----|----------|--------|-------|
 | `Filter` | ✓ | ✓ | — | Classic bit-slice Bloom filter |
-| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters; overflow at 255 |
+| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters; overflow at 255; `FillRatio` for occupancy |
 
 Sizing uses the standard formulas:
 

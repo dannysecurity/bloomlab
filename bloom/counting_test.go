@@ -51,6 +51,42 @@ func TestCountingFilterOverflow(t *testing.T) {
 	}
 }
 
+func TestCountingFilterFillRatio(t *testing.T) {
+	cf, err := NewCounting(64, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ratio := cf.FillRatio(); ratio != 0 {
+		t.Fatalf("empty filter fill ratio = %v, want 0", ratio)
+	}
+
+	if err := cf.Add([]byte("a")); err != nil {
+		t.Fatal(err)
+	}
+	if ratio := cf.FillRatio(); ratio <= 0 || ratio > 1 {
+		t.Fatalf("after add fill ratio = %v, want in (0, 1]", ratio)
+	}
+
+	if !cf.Remove([]byte("a")) {
+		t.Fatal("remove should succeed")
+	}
+	if ratio := cf.FillRatio(); ratio != 0 {
+		t.Fatalf("after remove fill ratio = %v, want 0", ratio)
+	}
+}
+
+func TestCountingFilterInvalidParams(t *testing.T) {
+	if _, err := NewCounting(0, 4); err != ErrInvalidCapacity {
+		t.Errorf("NewCounting(0): expected ErrInvalidCapacity, got %v", err)
+	}
+	if _, err := NewCountingFromTarget(0, 0.01); err != ErrInvalidCapacity {
+		t.Errorf("NewCountingFromTarget(0): expected ErrInvalidCapacity, got %v", err)
+	}
+	if _, err := NewCountingFromTarget(100, 0); err != ErrInvalidFPR {
+		t.Errorf("NewCountingFromTarget(100, 0): expected ErrInvalidFPR, got %v", err)
+	}
+}
+
 func TestCountingFilterDuplicateAdds(t *testing.T) {
 	cf, err := NewCountingFromTarget(64, 0.05)
 	if err != nil {

@@ -87,3 +87,14 @@ func (cf *CountingFilter) BitCount() uint64 { return cf.m }
 
 // HashCount returns k.
 func (cf *CountingFilter) HashCount() uint { return cf.k }
+
+// FillRatio returns the fraction of counters that are non-zero.
+func (cf *CountingFilter) FillRatio() float64 {
+	var occupied uint64
+	for _, c := range cf.counters {
+		if c > 0 {
+			occupied++
+		}
+	}
+	return float64(occupied) / float64(cf.m)
+}
