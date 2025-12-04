@@ -2,8 +2,11 @@ package bloom
 
 import (
 	"fmt"
+	"runtime"
 	"testing"
 )
+
+const benchItemCount = 100_000
 
 // Hash-set benchmarks mirror the Filter* cases so `go test -bench=. -benchmem`
 // can compare bloom filter throughput and allocation against map[string]struct{}.
@@ -90,4 +93,42 @@ func BenchmarkMapSetContainsMiss(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, _ = set["definitely-not-inserted"]
 	}
+}
+
+// Footprint benchmarks report storage-bytes/item alongside a steady lookup loop so
+// `go test -bench=Footprint -benchmem ./bloom/` compares space use at equal capacity.
+func BenchmarkFilterStorageFootprint(b *testing.B) {
+	f, err := New(benchItemCount, 0.01)
+	if err != nil {
+		b.Fatal(err)
+	}
+	for i := 0; i < benchItemCount; i++ {
+		f.Add([]byte(fmt.Sprintf("key-%d", i)))
+	}
+	storageBytes := (f.BitCount() + 7) / 8
+	probe := []byte("key-4242")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = f.Contains(probe)
+	}
+	b.StopTimer()
+	b.ReportMetric(float64(storageBytes)/benchItemCount, "storage-bytes/item")
+}
+
+func BenchmarkMapSetStorageFootprint(b *testing.B) {
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	set := make(map[string]struct{}, benchItemCount)
+	for i := 0; i < benchItemCount; i++ {
+		set[fmt.Sprintf("key-%d", i)] = struct{}{}
+	}
+	runtime.ReadMemStats(&after)
+	heapBytes := after.HeapAlloc - before.HeapAlloc
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = set["key-4242"]
+	}
+	b.StopTimer()
+	b.ReportMetric(float64(heapBytes)/benchItemCount, "storage-bytes/item")
 }

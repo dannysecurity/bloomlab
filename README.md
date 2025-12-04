@@ -78,6 +78,18 @@ go test ./...
 go test -bench=. -benchmem ./bloom/
 ```
 
+Compare Bloom filter throughput and memory against a `map[string]struct{}` hash set:
+
+```bash
+# Throughput: Add, Contains (hit/miss)
+go test -bench='Filter|MapSet' -benchmem ./bloom/
+
+# Space: storage-bytes/item at 100k inserts, 1% target FPR
+go test -bench=Footprint -benchmem ./bloom/
+```
+
+Bloom filters trade exact membership and per-insert heap allocations for a fixed bit slice; hash sets allocate per key but offer O(1) exact lookups with lower constant factors.
+
 ## API overview
 
 | Type | Add | Contains | Remove | Notes |
