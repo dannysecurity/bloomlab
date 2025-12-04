@@ -17,6 +17,8 @@ go get github.com/dannysecurity/bloomlab
 
 ## Quick start
 
+Configuration is expressed through `bloom.Config`, which both filter types share:
+
 ```go
 package main
 
@@ -26,20 +28,34 @@ import (
 )
 
 func main() {
-	// Expect ~10k items, ~1% false positive rate
-	f, _ := bloom.New(10_000, 0.01)
+	cfg := bloom.TargetConfig(10_000, 0.01) // ~10k items, ~1% FPR
+	f, _ := bloom.NewFilter(cfg)
 	f.Add([]byte("user:42"))
 	fmt.Println(f.Contains([]byte("user:42"))) // true
+	fmt.Println(cfg.String())                  // target n=10000 p=0.01 -> m=... k=...
 }
+```
+
+Shorthand constructors remain available:
+
+```go
+f, _ := bloom.New(10_000, 0.01)
 ```
 
 ### Counting variant (with deletion)
 
 ```go
-cf, _ := bloom.NewCountingFromTarget(10_000, 0.01)
+cfg := bloom.TargetConfig(10_000, 0.01)
+cf, _ := bloom.NewCountingFilter(cfg)
 _ = cf.Add([]byte("session:abc"))
 cf.Remove([]byte("session:abc"))
 fmt.Println(cf.Contains([]byte("session:abc"))) // false
+```
+
+For fixed sizing, use explicit configuration:
+
+```go
+cf, _ := bloom.NewCountingFilter(bloom.ExplicitConfig(1024, 4))
 ```
 
 ## Demo apps
@@ -68,6 +84,16 @@ go test -bench=. -benchmem ./bloom/
 |------|-----|----------|--------|-------|
 | `Filter` | ✓ | ✓ | — | Classic bit-slice Bloom filter |
 | `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters; overflow at 255; `FillRatio` for occupancy |
+
+### Configuration
+
+| Helper | Use when |
+|--------|----------|
+| `TargetConfig(n, p)` | Derive `m` and `k` from expected capacity and FPR |
+| `ExplicitConfig(m, k)` | Fix bit count and hash functions directly |
+| `Config.Validate()` / `Config.Size()` | Inspect or resolve sizing before construction |
+| `NewFilter(cfg)` / `NewCountingFilter(cfg)` | Primary constructors |
+| `New(n, p)` / `NewCountingFromTarget(n, p)` | Legacy shorthands for target sizing |
 
 Sizing uses the standard formulas:
 

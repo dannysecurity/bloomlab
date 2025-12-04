@@ -7,15 +7,16 @@ import (
 	"strings"
 
 	"github.com/dannysecurity/bloomlab/bloom"
+	"github.com/dannysecurity/bloomlab/cmd/internal/filterflags"
 )
 
 func main() {
-	capacity := flag.Uint64("n", 1000, "expected number of items")
-	fpr := flag.Float64("p", 0.01, "target false positive rate")
+	flags := filterflags.Register(10_000)
 	remove := flag.Bool("remove", false, "remove words instead of adding")
 	flag.Parse()
 
-	cf, err := bloom.NewCountingFromTarget(*capacity, *fpr)
+	cfg := flags.Config()
+	cf, err := bloom.NewCountingFilter(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "countingdemo: %v\n", err)
 		os.Exit(1)
@@ -23,7 +24,7 @@ func main() {
 
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Printf("Counting Bloom filter: m=%d counters, k=%d hashes\n", cf.BitCount(), cf.HashCount())
+		fmt.Println(cfg.String())
 		fmt.Println("Usage: countingdemo [flags] <word> ...")
 		os.Exit(0)
 	}

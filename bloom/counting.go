@@ -1,8 +1,6 @@
 package bloom
 
-import (
-	"errors"
-)
+import "errors"
 
 var ErrCounterOverflow = errors.New("bloom: counter overflow")
 
@@ -14,13 +12,11 @@ type CountingFilter struct {
 	k        uint
 }
 
-// NewCounting creates a counting Bloom filter with m bits and k hash functions.
-func NewCounting(m uint64, k uint) (*CountingFilter, error) {
-	if m == 0 {
-		return nil, ErrInvalidCapacity
-	}
-	if k == 0 {
-		k = 1
+// NewCountingFilter constructs a CountingFilter from cfg.
+func NewCountingFilter(cfg Config) (*CountingFilter, error) {
+	m, k, err := cfg.Size()
+	if err != nil {
+		return nil, err
 	}
 	return &CountingFilter{
 		counters: make([]uint8, m),
@@ -29,17 +25,14 @@ func NewCounting(m uint64, k uint) (*CountingFilter, error) {
 	}, nil
 }
 
+// NewCounting creates a counting Bloom filter with m bits and k hash functions.
+func NewCounting(m uint64, k uint) (*CountingFilter, error) {
+	return NewCountingFilter(ExplicitConfig(m, k))
+}
+
 // NewCountingFromTarget sizes a counting filter like a standard Bloom filter.
 func NewCountingFromTarget(expectedCapacity uint64, falsePositiveRate float64) (*CountingFilter, error) {
-	if expectedCapacity == 0 {
-		return nil, ErrInvalidCapacity
-	}
-	if falsePositiveRate <= 0 || falsePositiveRate >= 1 {
-		return nil, ErrInvalidFPR
-	}
-	m := optimalM(expectedCapacity, falsePositiveRate)
-	k := optimalK(m, expectedCapacity)
-	return NewCounting(m, k)
+	return NewCountingFilter(TargetConfig(expectedCapacity, falsePositiveRate))
 }
 
 // Add increments counters for key.

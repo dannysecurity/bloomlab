@@ -6,14 +6,15 @@ import (
 	"os"
 
 	"github.com/dannysecurity/bloomlab/bloom"
+	"github.com/dannysecurity/bloomlab/cmd/internal/filterflags"
 )
 
 func main() {
-	capacity := flag.Uint64("n", 10000, "expected number of items")
-	fpr := flag.Float64("p", 0.01, "target false positive rate")
+	flags := filterflags.Register(10_000)
 	flag.Parse()
 
-	f, err := bloom.New(*capacity, *fpr)
+	cfg := flags.Config()
+	f, err := bloom.NewFilter(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "bloomdemo: %v\n", err)
 		os.Exit(1)
@@ -21,7 +22,7 @@ func main() {
 
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Printf("Bloom filter: m=%d bits, k=%d hashes\n", f.BitCount(), f.HashCount())
+		fmt.Println(cfg.String())
 		fmt.Println("Usage: bloomdemo [flags] <word> ...")
 		os.Exit(0)
 	}
