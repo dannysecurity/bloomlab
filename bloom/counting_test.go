@@ -76,14 +76,42 @@ func TestCountingFilterFillRatio(t *testing.T) {
 }
 
 func TestCountingFilterInvalidParams(t *testing.T) {
-	if _, err := NewCounting(0, 4); err != ErrInvalidCapacity {
-		t.Errorf("NewCounting(0): expected ErrInvalidCapacity, got %v", err)
+	tests := []struct {
+		name    string
+		newFn   func() error
+		wantErr error
+	}{
+		{
+			name: "NewCounting zero capacity",
+			newFn: func() error {
+				_, err := NewCounting(0, 4)
+				return err
+			},
+			wantErr: ErrInvalidCapacity,
+		},
+		{
+			name: "NewCountingFromTarget zero capacity",
+			newFn: func() error {
+				_, err := NewCountingFromTarget(0, 0.01)
+				return err
+			},
+			wantErr: ErrInvalidCapacity,
+		},
+		{
+			name: "NewCountingFromTarget zero fpr",
+			newFn: func() error {
+				_, err := NewCountingFromTarget(100, 0)
+				return err
+			},
+			wantErr: ErrInvalidFPR,
+		},
 	}
-	if _, err := NewCountingFromTarget(0, 0.01); err != ErrInvalidCapacity {
-		t.Errorf("NewCountingFromTarget(0): expected ErrInvalidCapacity, got %v", err)
-	}
-	if _, err := NewCountingFromTarget(100, 0); err != ErrInvalidFPR {
-		t.Errorf("NewCountingFromTarget(100, 0): expected ErrInvalidFPR, got %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.newFn(); err != tt.wantErr {
+				t.Errorf("error = %v, want %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 

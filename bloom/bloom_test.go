@@ -2,6 +2,7 @@ package bloom
 
 import (
 	"testing"
+	"testing/quick"
 )
 
 func TestFilterAddContains(t *testing.T) {
@@ -32,27 +33,73 @@ func TestFilterAddContains(t *testing.T) {
 }
 
 func TestFilterInvalidParams(t *testing.T) {
-	if _, err := New(0, 0.01); err != ErrInvalidCapacity {
-		t.Errorf("expected ErrInvalidCapacity, got %v", err)
+	tests := []struct {
+		name     string
+		capacity uint64
+		fpr      float64
+		wantErr  error
+	}{
+		{"zero capacity", 0, 0.01, ErrInvalidCapacity},
+		{"zero fpr", 100, 0, ErrInvalidFPR},
+		{"fpr equals one", 100, 1.0, ErrInvalidFPR},
+		{"negative fpr", 100, -0.01, ErrInvalidFPR},
 	}
-	if _, err := New(100, 0); err != ErrInvalidFPR {
-		t.Errorf("expected ErrInvalidFPR, got %v", err)
-	}
-	if _, err := New(100, 1.0); err != ErrInvalidFPR {
-		t.Errorf("expected ErrInvalidFPR, got %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := New(tt.capacity, tt.fpr)
+			if err != tt.wantErr {
+				t.Errorf("New(%d, %v) error = %v, want %v", tt.capacity, tt.fpr, err, tt.wantErr)
+			}
+		})
 	}
 }
 
 func TestFilterSizing(t *testing.T) {
-	f, err := New(10_000, 0.001)
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name     string
+		capacity uint64
+		fpr      float64
+		minBits  uint64
+		minK     uint
+	}{
+		{"large tight filter", 10_000, 0.001, 64, 1},
+		{"small loose filter", 100, 0.1, 64, 1},
+		{"medium default", 1_000, 0.01, 64, 1},
 	}
-	if f.BitCount() < 64 {
-		t.Errorf("bit count too small: %d", f.BitCount())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, err := New(tt.capacity, tt.fpr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if f.BitCount() < tt.minBits {
+				t.Errorf("BitCount() = %d, want >= %d", f.BitCount(), tt.minBits)
+			}
+			if f.HashCount() < tt.minK {
+				t.Errorf("HashCount() = %d, want >= %d", f.HashCount(), tt.minK)
+			}
+		})
 	}
-	if f.HashCount() < 1 {
-		t.Error("hash count must be at least 1")
+}
+
+func TestFilterAddContainsProperty(t *testing.T) {
+	prop := func(capacity uint16, key []byte) bool {
+		if capacity == 0 {
+			capacity = 1
+		}
+		if len(key) == 0 {
+			return true
+		}
+		f, err := New(uint64(capacity), 0.05)
+		if err != nil {
+			return false
+		}
+		f.Add(key)
+		return f.Contains(key)
+	}
+	cfg := &quick.Config{MaxCount: 200}
+	if err := quick.Check(prop, cfg); err != nil {
+		t.Error(err)
 	}
 }
 
