@@ -1,27 +1,75 @@
 package bloom
 
 import (
-	"hash/fnv"
+	"fmt"
+	"strings"
 )
 
-// deriveHashes produces m bit positions for key using double hashing.
-// h(i) = (h1 + i*h2) mod m
-func deriveHashes(key []byte, m uint64, k uint) (h1, h2 uint64) {
-	h := fnv.New64a()
-	_, _ = h.Write(key)
-	h1 = h.Sum64()
+// Strategy selects the hash family used for double hashing.
+type Strategy int
 
-	h.Reset()
-	_, _ = h.Write(key)
-	_, _ = h.Write([]byte{0})
-	h2 = h.Sum64()
+const (
+	// HashFNV uses FNV-1a 64-bit with a second pass over key‖0x00 (default).
+	HashFNV Strategy = iota
+	// HashMurmur3 uses MurmurHash3 64-bit with independent seeds for h1 and h2.
+	HashMurmur3
+)
 
-	if h2 == 0 {
-		h2 = 1
+// String returns the CLI-friendly strategy name.
+func (s Strategy) String() string {
+	switch s {
+	case HashFNV:
+		return "fnv"
+	case HashMurmur3:
+		return "murmur3"
+	default:
+		return fmt.Sprintf("strategy(%d)", int(s))
 	}
-	return h1, h2
 }
 
+// ParseStrategy maps a name to a Strategy. Names are case-insensitive.
+func ParseStrategy(name string) (Strategy, error) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", "fnv":
+		return HashFNV, nil
+	case "murmur3", "murmur":
+		return HashMurmur3, nil
+	default:
+		return 0, fmt.Errorf("bloom: unknown hash strategy %q (want fnv or murmur3)", name)
+	}
+}
+
+// Hasher derives the two 64-bit seeds used for double hashing:
+// bit index i is (h1 + i*h2) mod m.
+type Hasher interface {
+	Strategy() Strategy
+	Derive(key []byte) (h1, h2 uint64)
+}
+
+// NewHasher constructs a Hasher for the given strategy and seed.
+// Seed lets independent filters share sizing but produce uncorrelated bit patterns.
+func NewHasher(strategy Strategy, seed uint64) Hasher {
+	switch strategy {
+	case HashMurmur3:
+		return murmur3Hasher{seed: seed}
+	default:
+		return fnvHasher{}
+	}
+}
+
+// bitIndex maps double-hash iteration i into a bit offset in [0, m).
 func bitIndex(h1, h2 uint64, m uint64, i uint) uint64 {
-	return (h1 + uint64(i)*h2) % m
+	sum := h1 + uint64(i)*h2
+	if m > 0 && m&(m-1) == 0 {
+		return sum & (m - 1)
+	}
+	return sum % m
+}
+
+// ensureH2NonZero guarantees h2 is usable for double hashing (h2 must not be 0).
+func ensureH2NonZero(h2 uint64) uint64 {
+	if h2 == 0 {
+		return 1
+	}
+	return h2
 }

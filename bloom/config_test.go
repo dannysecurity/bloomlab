@@ -124,7 +124,7 @@ func TestConfigString(t *testing.T) {
 	}
 
 	explicit := ExplicitConfig(128, 4)
-	if s := explicit.String(); s != "explicit m=128 k=4" {
+	if s := explicit.String(); s != "explicit m=128 k=4 hash=fnv" {
 		t.Errorf("ExplicitConfig.String() = %q", s)
 	}
 

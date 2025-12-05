@@ -13,7 +13,11 @@ func main() {
 	flags := filterflags.Register(10_000)
 	flag.Parse()
 
-	cfg := flags.Config()
+	cfg, err := flags.Config()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "bloomdemo: %v\n", err)
+		os.Exit(1)
+	}
 	f, err := bloom.NewFilter(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "bloomdemo: %v\n", err)

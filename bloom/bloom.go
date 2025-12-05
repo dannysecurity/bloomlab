@@ -2,10 +2,11 @@ package bloom
 
 // Filter is a classic Bloom filter backed by a bit slice.
 type Filter struct {
-	bits []byte
-	m    uint64 // number of bits
-	k    uint   // number of hash functions
-	n    uint64 // approximate insert count
+	bits   []byte
+	m      uint64 // number of bits
+	k      uint   // number of hash functions
+	n      uint64 // approximate insert count
+	hasher Hasher
 }
 
 // NewFilter constructs a Filter from cfg.
@@ -15,9 +16,10 @@ func NewFilter(cfg Config) (*Filter, error) {
 		return nil, err
 	}
 	return &Filter{
-		bits: make([]byte, (m+7)/8),
-		m:    m,
-		k:    k,
+		bits:   make([]byte, (m+7)/8),
+		m:      m,
+		k:      k,
+		hasher: cfg.Hasher(),
 	}, nil
 }
 
@@ -29,7 +31,7 @@ func New(expectedCapacity uint64, falsePositiveRate float64) (*Filter, error) {
 
 // Add inserts key into the filter.
 func (f *Filter) Add(key []byte) {
-	h1, h2 := deriveHashes(key, f.m, f.k)
+	h1, h2 := f.hasher.Derive(key)
 	for i := uint(0); i < f.k; i++ {
 		idx := bitIndex(h1, h2, f.m, i)
 		f.bits[idx/8] |= 1 << (idx % 8)
@@ -39,7 +41,7 @@ func (f *Filter) Add(key []byte) {
 
 // Contains reports whether key might be in the set (false positives possible).
 func (f *Filter) Contains(key []byte) bool {
-	h1, h2 := deriveHashes(key, f.m, f.k)
+	h1, h2 := f.hasher.Derive(key)
 	for i := uint(0); i < f.k; i++ {
 		idx := bitIndex(h1, h2, f.m, i)
 		if f.bits[idx/8]&(1<<(idx%8)) == 0 {

@@ -15,7 +15,11 @@ func main() {
 	remove := flag.Bool("remove", false, "remove words instead of adding")
 	flag.Parse()
 
-	cfg := flags.Config()
+	cfg, err := flags.Config()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "countingdemo: %v\n", err)
+		os.Exit(1)
+	}
 	cf, err := bloom.NewCountingFilter(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "countingdemo: %v\n", err)

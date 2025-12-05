@@ -66,8 +66,9 @@ Build and run from the repo root:
 # Standard Bloom filter — add/check words
 go run ./cmd/bloomdemo -n 5000 -p 0.01 hello world hello
 
-# Counting Bloom filter — add or remove
+# Counting Bloom filter — add or remove (optional murmur3 hashing)
 go run ./cmd/countingdemo alpha beta
+go run ./cmd/countingdemo -hash murmur3 -seed 42 alpha beta
 go run ./cmd/countingdemo -remove alpha
 ```
 
@@ -112,7 +113,25 @@ Sizing uses the standard formulas:
 - `m = -n · ln(p) / (ln 2)²`
 - `k = (m/n) · ln 2`
 
-Hashing uses FNV-1a double hashing to derive `k` bit positions.
+### Hashing
+
+Bit positions use **double hashing**: `h(i) = (h1 + i·h2) mod m`. The package provides pluggable hash strategies via `Config.HashStrategy` and `Config.HashSeed`:
+
+| Strategy | Name | Notes |
+|----------|------|-------|
+| `HashFNV` | `fnv` | Default; FNV-1a 64-bit (backward compatible) |
+| `HashMurmur3` | `murmur3` | MurmurHash3 64-bit with independent seeds for `h1`/`h2` |
+
+```go
+cfg := bloom.TargetConfig(10_000, 0.01)
+cfg.HashStrategy = bloom.HashMurmur3
+cfg.HashSeed = 42
+f, _ := bloom.NewFilter(cfg)
+```
+
+When `m` is a power of two, indexing uses a bitmask fast path instead of modulo. Changing strategy or seed changes bit positions — filters are not interoperable across hash settings.
+
+Demo CLIs accept `-hash fnv|murmur3` and `-seed <uint64>`.
 
 ## License
 

@@ -29,6 +29,11 @@ type Config struct {
 	// MinBits and MaxHashCount bound derived sizing. Zero values use package defaults.
 	MinBits      uint64
 	MaxHashCount uint
+
+	// HashStrategy selects the hash family for double hashing. Zero means HashFNV.
+	HashStrategy Strategy
+	// HashSeed seeds keyed hashing; use distinct seeds for independent filters.
+	HashSeed uint64
 }
 
 // TargetConfig returns a Config that derives m and k from expected capacity
@@ -83,16 +88,25 @@ func (c Config) Size() (m uint64, k uint, err error) {
 	return m, k, nil
 }
 
+// Hasher returns the configured hash implementation.
+func (c Config) Hasher() Hasher {
+	return NewHasher(c.HashStrategy, c.HashSeed)
+}
+
 // String summarizes the resolved sizing for debugging and CLI output.
 func (c Config) String() string {
 	m, k, err := c.Size()
 	if err != nil {
 		return fmt.Sprintf("invalid config: %v", err)
 	}
-	if c.Bits != 0 {
-		return fmt.Sprintf("explicit m=%d k=%d", m, k)
+	hash := c.HashStrategy.String()
+	if c.HashSeed != 0 {
+		hash = fmt.Sprintf("%s seed=%d", hash, c.HashSeed)
 	}
-	return fmt.Sprintf("target n=%d p=%g -> m=%d k=%d", c.ExpectedCapacity, c.FalsePositiveRate, m, k)
+	if c.Bits != 0 {
+		return fmt.Sprintf("explicit m=%d k=%d hash=%s", m, k, hash)
+	}
+	return fmt.Sprintf("target n=%d p=%g -> m=%d k=%d hash=%s", c.ExpectedCapacity, c.FalsePositiveRate, m, k, hash)
 }
 
 func (c Config) bounds() (minBits uint64, maxK uint) {

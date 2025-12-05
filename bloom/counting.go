@@ -10,6 +10,7 @@ type CountingFilter struct {
 	counters []uint8
 	m        uint64
 	k        uint
+	hasher   Hasher
 }
 
 // NewCountingFilter constructs a CountingFilter from cfg.
@@ -22,6 +23,7 @@ func NewCountingFilter(cfg Config) (*CountingFilter, error) {
 		counters: make([]uint8, m),
 		m:        m,
 		k:        k,
+		hasher:   cfg.Hasher(),
 	}, nil
 }
 
@@ -37,7 +39,7 @@ func NewCountingFromTarget(expectedCapacity uint64, falsePositiveRate float64) (
 
 // Add increments counters for key.
 func (cf *CountingFilter) Add(key []byte) error {
-	h1, h2 := deriveHashes(key, cf.m, cf.k)
+	h1, h2 := cf.hasher.Derive(key)
 	for i := uint(0); i < cf.k; i++ {
 		idx := bitIndex(h1, h2, cf.m, i)
 		if cf.counters[idx] == 255 {
@@ -53,7 +55,7 @@ func (cf *CountingFilter) Remove(key []byte) bool {
 	if !cf.Contains(key) {
 		return false
 	}
-	h1, h2 := deriveHashes(key, cf.m, cf.k)
+	h1, h2 := cf.hasher.Derive(key)
 	for i := uint(0); i < cf.k; i++ {
 		idx := bitIndex(h1, h2, cf.m, i)
 		if cf.counters[idx] > 0 {
@@ -65,7 +67,7 @@ func (cf *CountingFilter) Remove(key []byte) bool {
 
 // Contains reports whether key might be in the set.
 func (cf *CountingFilter) Contains(key []byte) bool {
-	h1, h2 := deriveHashes(key, cf.m, cf.k)
+	h1, h2 := cf.hasher.Derive(key)
 	for i := uint(0); i < cf.k; i++ {
 		idx := bitIndex(h1, h2, cf.m, i)
 		if cf.counters[idx] == 0 {
