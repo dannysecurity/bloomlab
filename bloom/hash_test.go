@@ -3,6 +3,7 @@ package bloom
 import (
 	"fmt"
 	"testing"
+	"testing/quick"
 )
 
 func TestParseStrategy(t *testing.T) {
@@ -70,6 +71,47 @@ func TestBitIndexInRange(t *testing.T) {
 		if idx >= m {
 			t.Fatalf("bitIndex out of range: idx=%d m=%d i=%d", idx, m, i)
 		}
+	}
+}
+
+func TestEnsureH2NonZero(t *testing.T) {
+	tests := []struct {
+		name string
+		h2   uint64
+		want uint64
+	}{
+		{"zero becomes one", 0, 1},
+		{"one unchanged", 1, 1},
+		{"nonzero unchanged", 42, 42},
+		{"max uint64 unchanged", ^uint64(0), ^uint64(0)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ensureH2NonZero(tt.h2); got != tt.want {
+				t.Errorf("ensureH2NonZero(%d) = %d, want %d", tt.h2, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBitIndexProperty(t *testing.T) {
+	prop := func(h1, h2 uint32, m uint32, i uint8) bool {
+		if m == 0 {
+			return true
+		}
+		got := bitIndex(uint64(h1), uint64(h2), uint64(m), uint(i))
+		if got >= uint64(m) {
+			return false
+		}
+		if m > 0 && m&(m-1) == 0 {
+			sum := uint64(h1) + uint64(i)*uint64(h2)
+			return got == sum%uint64(m)
+		}
+		return true
+	}
+	cfg := &quick.Config{MaxCount: 300}
+	if err := quick.Check(prop, cfg); err != nil {
+		t.Error(err)
 	}
 }
 
