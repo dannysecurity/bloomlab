@@ -53,6 +53,8 @@ func main() {
 		}
 	}
 
+	fmt.Printf("fill ratio: %.2f%%, inserts: %d, theoretical FPR: %.4f%%\n",
+		cf.FillRatio()*100, cf.ApproximateCount(), cf.TheoryFPR()*100)
 	if !*remove && len(args) > 0 {
 		fmt.Printf("checked: %s\n", strings.Join(args, ", "))
 	}

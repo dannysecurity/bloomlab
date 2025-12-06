@@ -1,6 +1,9 @@
 package bloom
 
-import "testing"
+import (
+	"testing"
+	"testing/quick"
+)
 
 func TestCountingFilterAddRemove(t *testing.T) {
 	cf, err := NewCountingFromTarget(256, 0.01)
@@ -132,5 +135,130 @@ func TestCountingFilterDuplicateAdds(t *testing.T) {
 	}
 	if !cf.Contains(key) {
 		t.Error("key should still appear present after one of three adds removed")
+	}
+	if got := cf.ApproximateCount(); got != 2 {
+		t.Errorf("ApproximateCount() = %d, want 2 after one remove of three adds", got)
+	}
+}
+
+func TestCountingFilterApproximateCount(t *testing.T) {
+	cf, err := NewCountingFromTarget(64, 0.05)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cf.ApproximateCount() != 0 {
+		t.Fatalf("empty filter count = %d, want 0", cf.ApproximateCount())
+	}
+
+	key := []byte("tracked")
+	for range 2 {
+		if err := cf.Add(key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := cf.ApproximateCount(); got != 2 {
+		t.Fatalf("after two adds count = %d, want 2", got)
+	}
+	if !cf.Remove(key) {
+		t.Fatal("remove should succeed")
+	}
+	if got := cf.ApproximateCount(); got != 1 {
+		t.Fatalf("after one remove count = %d, want 1", got)
+	}
+}
+
+func TestCountingFilterTheoryFPR(t *testing.T) {
+	cf, err := NewCountingFromTarget(1000, 0.01)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cf.TheoryFPR() != 0 {
+		t.Fatalf("empty filter FPR = %v, want 0", cf.TheoryFPR())
+	}
+
+	for i := 0; i < 1000; i++ {
+		if err := cf.Add([]byte{byte(i >> 8), byte(i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fpr := cf.TheoryFPR()
+	if fpr <= 0 || fpr > 0.05 {
+		t.Fatalf("TheoryFPR() = %v, want in (0, 0.05] for n=1000 p=0.01", fpr)
+	}
+}
+
+func TestCountingFilterAddContainsProperty(t *testing.T) {
+	prop := func(capacity uint16, key []byte) bool {
+		if capacity == 0 {
+			capacity = 1
+		}
+		if len(key) == 0 {
+			return true
+		}
+		cf, err := NewCountingFromTarget(uint64(capacity), 0.05)
+		if err != nil {
+			return false
+		}
+		if err := cf.Add(key); err != nil {
+			return false
+		}
+		return cf.Contains(key)
+	}
+	cfg := &quick.Config{MaxCount: 200}
+	if err := quick.Check(prop, cfg); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCountingFilterAddRemoveProperty(t *testing.T) {
+	prop := func(capacity uint16, key []byte) bool {
+		if capacity == 0 {
+			capacity = 1
+		}
+		if len(key) == 0 {
+			return true
+		}
+		cf, err := NewCountingFromTarget(uint64(capacity), 0.05)
+		if err != nil {
+			return false
+		}
+		if err := cf.Add(key); err != nil {
+			return false
+		}
+		if !cf.Remove(key) {
+			return false
+		}
+		return !cf.Contains(key)
+	}
+	cfg := &quick.Config{MaxCount: 200}
+	if err := quick.Check(prop, cfg); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCountingFilterFalsePositiveRate(t *testing.T) {
+	const n = 5000
+	cf, err := NewCountingFromTarget(n, 0.01)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < n; i++ {
+		if err := cf.Add([]byte{byte(i >> 8), byte(i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	falsePositives := 0
+	const trials = 5000
+	for i := n; i < n+trials; i++ {
+		if cf.Contains([]byte{byte(i >> 8), byte(i)}) {
+			falsePositives++
+		}
+	}
+
+	rate := float64(falsePositives) / trials
+	if rate > 0.05 {
+		t.Errorf("false positive rate %.4f exceeds tolerance for p=0.01", rate)
 	}
 }

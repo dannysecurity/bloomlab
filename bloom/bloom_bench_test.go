@@ -53,6 +53,28 @@ func BenchmarkCountingFilterAdd(b *testing.B) {
 	}
 }
 
+func BenchmarkCountingFilterContainsHit(b *testing.B) {
+	cf, _ := NewCountingFromTarget(100_000, 0.01)
+	key := []byte("benchmark-key")
+	_ = cf.Add(key)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = cf.Contains(key)
+	}
+}
+
+func BenchmarkCountingFilterContainsMiss(b *testing.B) {
+	cf, _ := NewCountingFromTarget(100_000, 0.01)
+	for i := 0; i < 1000; i++ {
+		_ = cf.Add([]byte(fmt.Sprintf("seed-%d", i)))
+	}
+	miss := []byte("definitely-not-inserted")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = cf.Contains(miss)
+	}
+}
+
 func BenchmarkCountingFilterRemove(b *testing.B) {
 	cf, _ := NewCountingFromTarget(100_000, 0.01)
 	keys := make([][]byte, b.N)
@@ -110,6 +132,26 @@ func BenchmarkFilterStorageFootprint(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = f.Contains(probe)
+	}
+	b.StopTimer()
+	b.ReportMetric(float64(storageBytes)/benchItemCount, "storage-bytes/item")
+}
+
+func BenchmarkCountingFilterStorageFootprint(b *testing.B) {
+	cf, err := NewCountingFromTarget(benchItemCount, 0.01)
+	if err != nil {
+		b.Fatal(err)
+	}
+	for i := 0; i < benchItemCount; i++ {
+		if err := cf.Add([]byte(fmt.Sprintf("key-%d", i))); err != nil {
+			b.Fatal(err)
+		}
+	}
+	storageBytes := cf.BitCount() // one byte per counter
+	probe := []byte("key-4242")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = cf.Contains(probe)
 	}
 	b.StopTimer()
 	b.ReportMetric(float64(storageBytes)/benchItemCount, "storage-bytes/item")

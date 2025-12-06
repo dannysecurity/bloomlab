@@ -50,6 +50,7 @@ cf, _ := bloom.NewCountingFilter(cfg)
 _ = cf.Add([]byte("session:abc"))
 cf.Remove([]byte("session:abc"))
 fmt.Println(cf.Contains([]byte("session:abc"))) // false
+fmt.Println(cf.TheoryFPR())                       // theoretical FPR at current insert count
 ```
 
 For fixed sizing, use explicit configuration:
@@ -144,7 +145,7 @@ Bloom filters trade exact membership and per-insert heap allocations for a fixed
 | Type | Add | Contains | Remove | Notes |
 |------|-----|----------|--------|-------|
 | `Filter` | ✓ | ✓ | — | Classic bit-slice Bloom filter |
-| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters; overflow at 255; `FillRatio` for occupancy |
+| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters; overflow at 255; `ApproximateCount`, `TheoryFPR`, `FillRatio` |
 
 ### Configuration
 
@@ -154,7 +155,7 @@ Bloom filters trade exact membership and per-insert heap allocations for a fixed
 | `ExplicitConfig(m, k)` | Fix bit count and hash functions directly |
 | `TheoryFalsePositiveRate(n, m, k)` | Theoretical FPR after `n` inserts |
 | `Config.TheoryFPRAt(n)` | FPR for a config at a given insert count |
-| `Filter.TheoryFPR()` | FPR at current insert count |
+| `Filter.TheoryFPR()` / `CountingFilter.TheoryFPR()` | FPR at current insert count |
 | `Config.Validate()` / `Config.Size()` | Inspect or resolve sizing before construction |
 | `NewFilter(cfg)` / `NewCountingFilter(cfg)` | Primary constructors |
 | `New(n, p)` / `NewCountingFromTarget(n, p)` | Legacy shorthands for target sizing |

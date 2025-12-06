@@ -10,6 +10,7 @@ type CountingFilter struct {
 	counters []uint8
 	m        uint64
 	k        uint
+	n        uint64 // approximate insert count (Add calls, not deduplicated)
 	hasher   Hasher
 }
 
@@ -47,6 +48,7 @@ func (cf *CountingFilter) Add(key []byte) error {
 		}
 		cf.counters[idx]++
 	}
+	cf.n++
 	return nil
 }
 
@@ -62,6 +64,9 @@ func (cf *CountingFilter) Remove(key []byte) bool {
 			cf.counters[idx]--
 		}
 	}
+	if cf.n > 0 {
+		cf.n--
+	}
 	return true
 }
 
@@ -75,6 +80,15 @@ func (cf *CountingFilter) Contains(key []byte) bool {
 		}
 	}
 	return true
+}
+
+// ApproximateCount returns the number of successful Add calls (not deduplicated).
+func (cf *CountingFilter) ApproximateCount() uint64 { return cf.n }
+
+// TheoryFPR returns the theoretical false positive rate at the current insert
+// count, using the filter's m, k, and ApproximateCount().
+func (cf *CountingFilter) TheoryFPR() float64 {
+	return TheoryFalsePositiveRate(cf.n, cf.m, cf.k)
 }
 
 // BitCount returns m.
