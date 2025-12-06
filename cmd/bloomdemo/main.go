@@ -41,5 +41,6 @@ func main() {
 		}
 	}
 
-	fmt.Printf("fill ratio: %.2f%%, inserts: %d\n", f.FillRatio()*100, f.ApproximateCount())
+	fmt.Printf("fill ratio: %.2f%%, inserts: %d, theoretical FPR: %.4f%%\n",
+		f.FillRatio()*100, f.ApproximateCount(), f.TheoryFPR()*100)
 }

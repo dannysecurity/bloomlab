@@ -60,6 +60,12 @@ func (f *Filter) BitCount() uint64 { return f.m }
 // HashCount returns k (number of hash functions).
 func (f *Filter) HashCount() uint { return f.k }
 
+// TheoryFPR returns the theoretical false positive rate at the current insert
+// count, using the filter's m, k, and ApproximateCount().
+func (f *Filter) TheoryFPR() float64 {
+	return TheoryFalsePositiveRate(f.n, f.m, f.k)
+}
+
 // FillRatio returns the fraction of bits set to 1.
 func (f *Filter) FillRatio() float64 {
 	var set uint64

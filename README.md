@@ -58,6 +58,54 @@ For fixed sizing, use explicit configuration:
 cf, _ := bloom.NewCountingFilter(bloom.ExplicitConfig(1024, 4))
 ```
 
+## False positive rate
+
+A Bloom filter may report **maybe present** for keys that were never inserted. That **false positive rate (FPR)** is the probability `TargetConfig(n, p)` sizes for.
+
+### Definition
+
+After inserting `n` distinct keys, query a key known to be absent. Each of the `k` probed bit positions is set with probability roughly `1 - e^(-kn/m)`, treating positions as independent. All `k` must be set for a false positive:
+
+```
+p ≈ (1 - e^(-kn/m))^k
+```
+
+There are no false negatives: if a key was inserted, `Contains` always returns true.
+
+### Sizing formulas
+
+Given target capacity `n` and desired FPR upper bound `p`, bloomlab picks `m` (bits) and `k` (hash functions) to minimize space while meeting the budget:
+
+- `m = -n · ln(p) / (ln 2)²`
+- `k = (m/n) · ln 2` (rounded, with a minimum of 1)
+
+This `(m, k)` pair is optimal for fixed `n` and `m`: the achieved rate is close to `(1/2)^k`. The formulas appear in `optimalM` / `optimalK` inside `bloom/config.go`.
+
+### Theory vs. practice
+
+| Factor | Effect on FPR |
+|--------|----------------|
+| Duplicate inserts | Raise fill ratio without new membership info → higher FPR |
+| `MinBits` floor | Forces larger `m` than the formula → lower FPR than target |
+| `MaxHashCount` cap | Limits `k` → can exceed target FPR |
+| Hash quality | Poor mixing can deviate from the independence model |
+
+Use `TheoryFalsePositiveRate(n, m, k)` to evaluate a sizing plan, `Config.TheoryFPRAt(n)` before construction, or `Filter.TheoryFPR()` at runtime:
+
+```go
+cfg := bloom.TargetConfig(10_000, 0.01)
+m, k, _ := cfg.Size()
+fmt.Println(bloom.TheoryFalsePositiveRate(10_000, m, k)) // ~0.01
+
+f, _ := bloom.NewFilter(cfg)
+for i := 0; i < 10_000; i++ {
+	f.Add([]byte(fmt.Sprintf("key:%d", i)))
+}
+fmt.Println(f.TheoryFPR()) // theoretical FPR at current insert count
+```
+
+Empirical validation lives in `TestFalsePositiveRate` (`bloom/bloom_test.go`).
+
 ## Demo apps
 
 Build and run from the repo root:
@@ -104,14 +152,19 @@ Bloom filters trade exact membership and per-insert heap allocations for a fixed
 |--------|----------|
 | `TargetConfig(n, p)` | Derive `m` and `k` from expected capacity and FPR |
 | `ExplicitConfig(m, k)` | Fix bit count and hash functions directly |
+| `TheoryFalsePositiveRate(n, m, k)` | Theoretical FPR after `n` inserts |
+| `Config.TheoryFPRAt(n)` | FPR for a config at a given insert count |
+| `Filter.TheoryFPR()` | FPR at current insert count |
 | `Config.Validate()` / `Config.Size()` | Inspect or resolve sizing before construction |
 | `NewFilter(cfg)` / `NewCountingFilter(cfg)` | Primary constructors |
 | `New(n, p)` / `NewCountingFromTarget(n, p)` | Legacy shorthands for target sizing |
 
-Sizing uses the standard formulas:
+Target sizing uses:
 
 - `m = -n · ln(p) / (ln 2)²`
 - `k = (m/n) · ln 2`
+
+See [False positive rate](#false-positive-rate) for the full `p ≈ (1 - e^(-kn/m))^k` derivation and practical caveats.
 
 ### Hashing
 
