@@ -7,7 +7,7 @@ A Go toolkit for [Bloom filters](https://en.wikipedia.org/wiki/Bloom_filter): sp
 - **Standard Bloom filter** (`bloom.Filter`) — fixed-size bit array, optimal `m` and `k` from target capacity and FPR
 - **Counting Bloom filter** (`bloom.CountingFilter`) — supports deletion via per-bit counters
 - **Benchmarks** — add, lookup, and remove throughput
-- **Demo CLIs** — `bloomdemo` and `countingdemo` for interactive exploration
+- **Demo CLIs** — `bloomdemo`, `countingdemo`, and `urldedup` for interactive exploration
 
 ## Install
 
@@ -129,6 +129,10 @@ go run ./cmd/bloomdemo -n 5000 -p 0.01 hello world hello
 go run ./cmd/countingdemo alpha beta
 go run ./cmd/countingdemo -hash murmur3 -seed 42 alpha beta
 go run ./cmd/countingdemo -remove alpha
+
+# Stream deduper — classify stdin lines as new or duplicate (URLs, logs, etc.)
+printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/urldedup
+printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/urldedup -quiet
 ```
 
 ## Tests & benchmarks
