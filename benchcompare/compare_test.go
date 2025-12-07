@@ -3,6 +3,8 @@ package benchcompare
 import (
 	"strings"
 	"testing"
+
+	"github.com/dannysecurity/bloomlab/bloom"
 )
 
 func TestCompareAllScenarios(t *testing.T) {
@@ -31,6 +33,126 @@ func TestCompareAllScenarios(t *testing.T) {
 		if cmp.HashSet.BytesPerItem <= 0 {
 			t.Errorf("%s: hashset bytes/item must be positive", cmp.Scenario)
 		}
+	}
+}
+
+func TestCompareAddAllocatesLessThanHashSet(t *testing.T) {
+	cfg := Config{
+		ItemCount:         1_000,
+		FalsePositiveRate: 0.01,
+		LookupRepeats:     1,
+	}
+	results, err := Compare(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var add Comparison
+	for _, cmp := range results {
+		if cmp.Scenario == ScenarioAdd {
+			add = cmp
+			break
+		}
+	}
+	if add.HashSet.AllocsPerOp <= add.Bloom.AllocsPerOp {
+		t.Fatalf("add: hash set allocs/op %.2f should exceed bloom %.2f",
+			add.HashSet.AllocsPerOp, add.Bloom.AllocsPerOp)
+	}
+	if add.AllocRatio() <= 1 {
+		t.Fatalf("add: AllocRatio = %.2f, want > 1", add.AllocRatio())
+	}
+}
+
+func TestCompareWithMurmur3Hash(t *testing.T) {
+	cfg := Config{
+		ItemCount:         500,
+		FalsePositiveRate: 0.01,
+		LookupRepeats:     1,
+		Hash: bloom.HashConfig{
+			Strategy: bloom.HashMurmur3,
+			Seed:     7,
+		},
+	}
+	results, err := Compare(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != len(AllScenarios) {
+		t.Fatalf("got %d results, want %d", len(results), len(AllScenarios))
+	}
+}
+
+func TestCompareFPRSweep(t *testing.T) {
+	cfg := Config{ItemCount: 2_000, LookupRepeats: 1}
+	rates := []float64{0.01, 0.05, 0.1}
+	results, err := CompareFPRSweep(cfg, rates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != len(rates) {
+		t.Fatalf("got %d sweep results, want %d", len(results), len(rates))
+	}
+	prevBloomBytes := 0.0
+	for i, cmp := range results {
+		if cmp.Scenario != ScenarioAdd {
+			t.Fatalf("sweep[%d]: scenario = %q, want add", i, cmp.Scenario)
+		}
+		if i > 0 && cmp.Bloom.BytesPerItem >= prevBloomBytes {
+			t.Fatalf("sweep[%d]: bloom bytes/item %.1f should shrink as p rises (prev %.1f)",
+				i, cmp.Bloom.BytesPerItem, prevBloomBytes)
+		}
+		prevBloomBytes = cmp.Bloom.BytesPerItem
+		if cmp.HashSet.BytesPerItem <= 0 {
+			t.Fatalf("sweep[%d]: hash set bytes/item must be positive", i)
+		}
+	}
+}
+
+func TestCompareFPRSweepInvalidRate(t *testing.T) {
+	cfg := Config{ItemCount: 100}
+	_, err := CompareFPRSweep(cfg, []float64{0, 0.01})
+	if err == nil {
+		t.Fatal("expected error for zero FPR rate")
+	}
+	_, err = CompareFPRSweep(cfg, nil)
+	if err == nil {
+		t.Fatal("expected error for empty rates")
+	}
+}
+
+func TestParseFPRRates(t *testing.T) {
+	rates, err := ParseFPRRates("0.001, 0.01 ,0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rates) != 3 {
+		t.Fatalf("got %d rates, want 3", len(rates))
+	}
+	if rates[1] != 0.01 {
+		t.Fatalf("rates[1] = %v, want 0.01", rates[1])
+	}
+	_, err = ParseFPRRates("")
+	if err == nil {
+		t.Fatal("expected error for empty string")
+	}
+}
+
+func TestFormatFPRSweep(t *testing.T) {
+	cfg := Config{ItemCount: 500, LookupRepeats: 1}
+	rates := []float64{0.01, 0.1}
+	results, err := CompareFPRSweep(cfg, rates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := FormatFPRSweep(cfg, rates, results)
+	if !strings.Contains(text, "FPR sweep") {
+		t.Fatal("sweep report missing title")
+	}
+	if !strings.Contains(text, "0.0100") {
+		t.Fatal("sweep report missing first rate")
+	}
+	md := FormatFPRSweepMarkdown(cfg, rates, results)
+	if !strings.Contains(md, "| Target p |") {
+		t.Fatal("sweep markdown missing header")
 	}
 }
 
@@ -74,14 +196,17 @@ func TestCompareInvalidConfig(t *testing.T) {
 func TestSpeedAndSpaceRatios(t *testing.T) {
 	cmp := Comparison{
 		Scenario: ScenarioAdd,
-		Bloom:    BackendResult{NsPerOp: 100, BytesPerItem: 10},
-		HashSet:  BackendResult{NsPerOp: 200, BytesPerItem: 50},
+		Bloom:    BackendResult{NsPerOp: 100, BytesPerItem: 10, AllocsPerOp: 0.1},
+		HashSet:  BackendResult{NsPerOp: 200, BytesPerItem: 50, AllocsPerOp: 2.0},
 	}
 	if ratio := cmp.SpeedRatio(); ratio != 2 {
 		t.Fatalf("SpeedRatio = %v, want 2", ratio)
 	}
 	if ratio := cmp.SpaceRatio(); ratio != 5 {
 		t.Fatalf("SpaceRatio = %v, want 5", ratio)
+	}
+	if ratio := cmp.AllocRatio(); ratio != 20 {
+		t.Fatalf("AllocRatio = %v, want 20", ratio)
 	}
 }
 
@@ -99,6 +224,9 @@ func TestFormatReportContainsScenarios(t *testing.T) {
 	}
 	if !strings.Contains(text, "Speedup > 1") {
 		t.Error("report missing legend")
+	}
+	if !strings.Contains(text, "allocs/op") {
+		t.Error("report missing allocation columns")
 	}
 }
 

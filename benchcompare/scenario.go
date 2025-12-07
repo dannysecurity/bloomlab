@@ -1,5 +1,7 @@
 package benchcompare
 
+import "github.com/dannysecurity/bloomlab/bloom"
+
 // Scenario names a membership workload to compare between a Bloom filter and
 // a hash set.
 type Scenario string
@@ -31,6 +33,24 @@ type Config struct {
 	FalsePositiveRate float64
 	// LookupRepeats is how many times each lookup key is queried per scenario.
 	LookupRepeats int
+	// Hash selects the Bloom filter hash family and seed (ignored by hash sets).
+	Hash bloom.HashConfig
+}
+
+// bloomOptions returns functional options for bloom.TargetConfig.
+func (cfg Config) bloomOptions() []bloom.ConfigOption {
+	var opts []bloom.ConfigOption
+	if cfg.Hash.Strategy != 0 {
+		opts = append(opts, bloom.WithHash(cfg.Hash.Strategy))
+	}
+	if cfg.Hash.Seed != 0 {
+		opts = append(opts, bloom.WithSeed(cfg.Hash.Seed))
+	}
+	return opts
+}
+
+func (cfg Config) targetBloomConfig() bloom.Config {
+	return bloom.TargetConfig(cfg.ItemCount, cfg.FalsePositiveRate, cfg.bloomOptions()...)
 }
 
 // DefaultConfig returns settings aligned with bloom/bloom_bench_test.go.

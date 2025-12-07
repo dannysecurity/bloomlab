@@ -82,5 +82,7 @@ func BenchmarkReportMetrics(b *testing.B) {
 		b.ReportMetric(cmp.HashSet.NsPerOp, label)
 		label = fmt.Sprintf("%s-space-ratio", cmp.Scenario)
 		b.ReportMetric(cmp.SpaceRatio(), label)
+		label = fmt.Sprintf("%s-alloc-ratio", cmp.Scenario)
+		b.ReportMetric(cmp.AllocRatio(), label)
 	}
 }

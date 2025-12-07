@@ -50,7 +50,7 @@ func compareAdd(cfg Config) (Comparison, error) {
 	keys := makeKeys(cfg.ItemCount)
 
 	bloomStart := time.Now()
-	f, err := bloom.NewFilter(bloom.TargetConfig(cfg.ItemCount, cfg.FalsePositiveRate))
+	f, err := bloom.NewFilter(cfg.targetBloomConfig())
 	if err != nil {
 		return Comparison{}, err
 	}
@@ -72,24 +72,43 @@ func compareAdd(cfg Config) (Comparison, error) {
 	hashElapsed := time.Since(hashStart)
 	hashBytes := float64(after.HeapAlloc - before.HeapAlloc)
 
-	n := float64(len(keys))
+	n := len(keys)
+	bloomAllocs := allocsPerOp(n, func() {
+		ff, err := bloom.NewFilter(cfg.targetBloomConfig())
+		if err != nil {
+			panic(err)
+		}
+		for _, key := range keys {
+			ff.Add(key)
+		}
+	})
+	hashAllocs := allocsPerOp(n, func() {
+		s := make(map[string]struct{}, int(cfg.ItemCount))
+		for _, key := range keys {
+			s[string(key)] = struct{}{}
+		}
+	})
+
+	nf := float64(n)
 	return Comparison{
 		Scenario: ScenarioAdd,
 		Bloom: BackendResult{
-			NsPerOp:      float64(bloomElapsed.Nanoseconds()) / n,
-			BytesPerItem: bloomBytes / n,
+			NsPerOp:      float64(bloomElapsed.Nanoseconds()) / nf,
+			BytesPerItem: bloomBytes / nf,
+			AllocsPerOp:  bloomAllocs,
 			TheoryFPR:    f.TheoryFPR(),
 		},
 		HashSet: BackendResult{
-			NsPerOp:      float64(hashElapsed.Nanoseconds()) / n,
-			BytesPerItem: hashBytes / n,
+			NsPerOp:      float64(hashElapsed.Nanoseconds()) / nf,
+			BytesPerItem: hashBytes / nf,
+			AllocsPerOp:  hashAllocs,
 		},
 	}, nil
 }
 
 func compareContainsHit(cfg Config) (Comparison, error) {
 	keys := makeKeys(cfg.ItemCount)
-	f, err := bloom.NewFilter(bloom.TargetConfig(cfg.ItemCount, cfg.FalsePositiveRate))
+	f, err := bloom.NewFilter(cfg.targetBloomConfig())
 	if err != nil {
 		return Comparison{}, err
 	}
@@ -100,7 +119,7 @@ func compareContainsHit(cfg Config) (Comparison, error) {
 	}
 
 	repeats := cfg.LookupRepeats
-	totalOps := float64(len(keys) * repeats)
+	totalOps := len(keys) * repeats
 
 	bloomStart := time.Now()
 	for r := 0; r < repeats; r++ {
@@ -121,23 +140,41 @@ func compareContainsHit(cfg Config) (Comparison, error) {
 	bloomBytes := float64((f.BitCount() + 7) / 8)
 	hashBytes := mapHeapBytes(set)
 
+	bloomAllocs := allocsPerOp(totalOps, func() {
+		for r := 0; r < repeats; r++ {
+			for _, key := range keys {
+				_ = f.Contains(key)
+			}
+		}
+	})
+	hashAllocs := allocsPerOp(totalOps, func() {
+		for r := 0; r < repeats; r++ {
+			for _, key := range keys {
+				_, _ = set[string(key)]
+			}
+		}
+	})
+
+	total := float64(totalOps)
 	return Comparison{
 		Scenario: ScenarioContainsHit,
 		Bloom: BackendResult{
-			NsPerOp:      float64(bloomElapsed.Nanoseconds()) / totalOps,
+			NsPerOp:      float64(bloomElapsed.Nanoseconds()) / total,
 			BytesPerItem: bloomBytes / float64(len(keys)),
+			AllocsPerOp:  bloomAllocs,
 			TheoryFPR:    f.TheoryFPR(),
 		},
 		HashSet: BackendResult{
-			NsPerOp:      float64(hashElapsed.Nanoseconds()) / totalOps,
+			NsPerOp:      float64(hashElapsed.Nanoseconds()) / total,
 			BytesPerItem: hashBytes / float64(len(keys)),
+			AllocsPerOp:  hashAllocs,
 		},
 	}, nil
 }
 
 func compareContainsMiss(cfg Config) (Comparison, error) {
 	seedKeys := makeKeys(cfg.ItemCount)
-	f, err := bloom.NewFilter(bloom.TargetConfig(cfg.ItemCount, cfg.FalsePositiveRate))
+	f, err := bloom.NewFilter(cfg.targetBloomConfig())
 	if err != nil {
 		return Comparison{}, err
 	}
@@ -149,7 +186,7 @@ func compareContainsMiss(cfg Config) (Comparison, error) {
 
 	missKeys := makeMissKeys(cfg.ItemCount)
 	repeats := cfg.LookupRepeats
-	totalOps := float64(len(missKeys) * repeats)
+	totalOps := len(missKeys) * repeats
 
 	bloomStart := time.Now()
 	for r := 0; r < repeats; r++ {
@@ -170,16 +207,34 @@ func compareContainsMiss(cfg Config) (Comparison, error) {
 	bloomBytes := float64((f.BitCount() + 7) / 8)
 	hashBytes := mapHeapBytes(set)
 
+	bloomAllocs := allocsPerOp(totalOps, func() {
+		for r := 0; r < repeats; r++ {
+			for _, key := range missKeys {
+				_ = f.Contains(key)
+			}
+		}
+	})
+	hashAllocs := allocsPerOp(totalOps, func() {
+		for r := 0; r < repeats; r++ {
+			for _, key := range missKeys {
+				_, _ = set[string(key)]
+			}
+		}
+	})
+
+	total := float64(totalOps)
 	return Comparison{
 		Scenario: ScenarioContainsMiss,
 		Bloom: BackendResult{
-			NsPerOp:      float64(bloomElapsed.Nanoseconds()) / totalOps,
+			NsPerOp:      float64(bloomElapsed.Nanoseconds()) / total,
 			BytesPerItem: bloomBytes / float64(len(seedKeys)),
+			AllocsPerOp:  bloomAllocs,
 			TheoryFPR:    f.TheoryFPR(),
 		},
 		HashSet: BackendResult{
-			NsPerOp:      float64(hashElapsed.Nanoseconds()) / totalOps,
+			NsPerOp:      float64(hashElapsed.Nanoseconds()) / total,
 			BytesPerItem: hashBytes / float64(len(seedKeys)),
+			AllocsPerOp:  hashAllocs,
 		},
 	}, nil
 }
@@ -188,7 +243,7 @@ func compareMixedStream(cfg Config) (Comparison, error) {
 	// First half unique, second half repeats — typical dedup stream shape.
 	stream := makeMixedStream(cfg.ItemCount)
 
-	f, err := bloom.NewFilter(bloom.TargetConfig(cfg.ItemCount, cfg.FalsePositiveRate))
+	f, err := bloom.NewFilter(cfg.targetBloomConfig())
 	if err != nil {
 		return Comparison{}, err
 	}
@@ -217,21 +272,47 @@ func compareMixedStream(cfg Config) (Comparison, error) {
 	}
 	hashElapsed := time.Since(hashStart)
 
-	n := float64(len(stream))
+	n := len(stream)
 	bloomBytes := float64((f.BitCount() + 7) / 8)
 	hashBytes := mapHeapBytes(set)
 
+	bloomAllocs := allocsPerOp(n, func() {
+		ff, err := bloom.NewFilter(cfg.targetBloomConfig())
+		if err != nil {
+			panic(err)
+		}
+		for _, key := range stream {
+			if ff.Contains(key) {
+				continue
+			}
+			ff.Add(key)
+		}
+	})
+	hashAllocs := allocsPerOp(n, func() {
+		ss := make(map[string]struct{}, int(cfg.ItemCount))
+		for _, key := range stream {
+			s := string(key)
+			if _, ok := ss[s]; ok {
+				continue
+			}
+			ss[s] = struct{}{}
+		}
+	})
+
+	nf := float64(n)
 	return Comparison{
 		Scenario: ScenarioMixedStream,
 		Bloom: BackendResult{
-			NsPerOp:        float64(bloomElapsed.Nanoseconds()) / n,
+			NsPerOp:        float64(bloomElapsed.Nanoseconds()) / nf,
 			BytesPerItem:   bloomBytes / float64(f.ApproximateCount()),
+			AllocsPerOp:    bloomAllocs,
 			TheoryFPR:      f.TheoryFPR(),
 			FalsePositives: bloomFP,
 		},
 		HashSet: BackendResult{
-			NsPerOp:        float64(hashElapsed.Nanoseconds()) / n,
+			NsPerOp:        float64(hashElapsed.Nanoseconds()) / nf,
 			BytesPerItem:   hashBytes / float64(len(set)),
+			AllocsPerOp:    hashAllocs,
 			FalsePositives: hashFP,
 		},
 	}, nil

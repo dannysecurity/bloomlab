@@ -36,6 +36,15 @@ func (c Comparison) SpaceRatio() float64 {
 	return c.HashSet.BytesPerItem / c.Bloom.BytesPerItem
 }
 
+// AllocRatio returns hash-set allocs/op divided by bloom allocs/op. Values above
+// 1 mean the Bloom filter allocated less heap per operation.
+func (c Comparison) AllocRatio() float64 {
+	if c.Bloom.AllocsPerOp <= 0 {
+		return 0
+	}
+	return c.HashSet.AllocsPerOp / c.Bloom.AllocsPerOp
+}
+
 // SummaryLine returns a one-line human-readable comparison.
 func (c Comparison) SummaryLine() string {
 	return fmt.Sprintf("%s: bloom %.0f ns/op (%.1f B/item) vs hashset %.0f ns/op (%.1f B/item) — %.2fx faster, %.1fx smaller",

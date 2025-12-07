@@ -6,23 +6,25 @@ import (
 	"text/tabwriter"
 )
 
+func configHeader(cfg Config) string {
+	hashNote := ""
+	if cfg.Hash.Strategy != 0 || cfg.Hash.Seed != 0 {
+		hashNote = fmt.Sprintf(", hash=%s", cfg.Hash.String())
+	}
+	return fmt.Sprintf("Bloom filter vs hash set (n=%d, p=%.4f, lookup-repeats=%d%s)",
+		cfg.ItemCount, cfg.FalsePositiveRate, cfg.LookupRepeats, hashNote)
+}
+
 // FormatReport renders comparisons as a fixed-width table suitable for stdout.
 func FormatReport(cfg Config, results []Comparison) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Bloom filter vs hash set (n=%d, p=%.4f, lookup-repeats=%d)\n\n",
-		cfg.ItemCount, cfg.FalsePositiveRate, cfg.LookupRepeats)
+	fmt.Fprintf(&b, "%s\n\n", configHeader(cfg))
 
 	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "SCENARIO\tBLOOM ns/op\tHASHSET ns/op\tSPEEDUP\tBLOOM B/item\tHASHSET B/item\tSPACE\tNOTES")
+	fmt.Fprintln(tw, "SCENARIO\tBLOOM ns/op\tHASHSET ns/op\tSPEEDUP\tBLOOM B/item\tHASHSET B/item\tSPACE\tBLOOM allocs/op\tHASHSET allocs/op\tALLOCS\tNOTES")
 	for _, cmp := range results {
-		notes := ""
-		if cmp.Bloom.TheoryFPR > 0 {
-			notes = fmt.Sprintf("theory FPR %.3f%%", cmp.Bloom.TheoryFPR*100)
-		}
-		if cmp.Scenario == ScenarioMixedStream {
-			notes = fmt.Sprintf("dup calls bloom=%d hashset=%d", cmp.Bloom.FalsePositives, cmp.HashSet.FalsePositives)
-		}
-		fmt.Fprintf(tw, "%s\t%.0f\t%.0f\t%.2fx\t%.1f\t%.1f\t%.1fx\t%s\n",
+		notes := formatNotes(cmp)
+		fmt.Fprintf(tw, "%s\t%.0f\t%.0f\t%.2fx\t%.1f\t%.1f\t%.1fx\t%.2f\t%.2f\t%.1fx\t%s\n",
 			cmp.Scenario,
 			cmp.Bloom.NsPerOp,
 			cmp.HashSet.NsPerOp,
@@ -30,12 +32,15 @@ func FormatReport(cfg Config, results []Comparison) string {
 			cmp.Bloom.BytesPerItem,
 			cmp.HashSet.BytesPerItem,
 			cmp.SpaceRatio(),
+			cmp.Bloom.AllocsPerOp,
+			cmp.HashSet.AllocsPerOp,
+			cmp.AllocRatio(),
 			notes,
 		)
 	}
 	_ = tw.Flush()
 
-	b.WriteString("\nSpeedup > 1 means Bloom was faster; space > 1 means Bloom used less memory per item.\n")
+	b.WriteString("\nSpeedup > 1 means Bloom was faster; space > 1 means Bloom used less memory per item; allocs > 1 means Bloom allocated less per op.\n")
 	return b.String()
 }
 
@@ -43,19 +48,17 @@ func FormatReport(cfg Config, results []Comparison) string {
 func FormatMarkdown(cfg Config, results []Comparison) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Bloom filter vs hash set\n\n")
-	fmt.Fprintf(&b, "Configuration: `n=%d`, `p=%.4f`, lookup repeats `%d`.\n\n",
-		cfg.ItemCount, cfg.FalsePositiveRate, cfg.LookupRepeats)
-	fmt.Fprintln(&b, "| Scenario | Bloom ns/op | Hash set ns/op | Speedup | Bloom B/item | Hash set B/item | Space ratio | Notes |")
-	fmt.Fprintln(&b, "|----------|-------------|----------------|---------|--------------|-----------------|-------------|-------|")
+	hashNote := ""
+	if cfg.Hash.Strategy != 0 || cfg.Hash.Seed != 0 {
+		hashNote = fmt.Sprintf(", hash `%s`", cfg.Hash.String())
+	}
+	fmt.Fprintf(&b, "Configuration: `n=%d`, `p=%.4f`, lookup repeats `%d`%s.\n\n",
+		cfg.ItemCount, cfg.FalsePositiveRate, cfg.LookupRepeats, hashNote)
+	fmt.Fprintln(&b, "| Scenario | Bloom ns/op | Hash set ns/op | Speedup | Bloom B/item | Hash set B/item | Space ratio | Bloom allocs/op | Hash set allocs/op | Alloc ratio | Notes |")
+	fmt.Fprintln(&b, "|----------|-------------|----------------|---------|--------------|-----------------|-------------|-----------------|--------------------|-------------|-------|")
 	for _, cmp := range results {
-		notes := ""
-		if cmp.Bloom.TheoryFPR > 0 && cmp.Scenario != ScenarioMixedStream {
-			notes = fmt.Sprintf("theory FPR %.3f%%", cmp.Bloom.TheoryFPR*100)
-		}
-		if cmp.Scenario == ScenarioMixedStream {
-			notes = fmt.Sprintf("dup calls bloom=%d hashset=%d", cmp.Bloom.FalsePositives, cmp.HashSet.FalsePositives)
-		}
-		fmt.Fprintf(&b, "| %s | %.0f | %.0f | %.2fx | %.1f | %.1f | %.1fx | %s |\n",
+		notes := formatNotes(cmp)
+		fmt.Fprintf(&b, "| %s | %.0f | %.0f | %.2fx | %.1f | %.1f | %.1fx | %.2f | %.2f | %.1fx | %s |\n",
 			cmp.Scenario,
 			cmp.Bloom.NsPerOp,
 			cmp.HashSet.NsPerOp,
@@ -63,8 +66,73 @@ func FormatMarkdown(cfg Config, results []Comparison) string {
 			cmp.Bloom.BytesPerItem,
 			cmp.HashSet.BytesPerItem,
 			cmp.SpaceRatio(),
+			cmp.Bloom.AllocsPerOp,
+			cmp.HashSet.AllocsPerOp,
+			cmp.AllocRatio(),
 			notes,
 		)
 	}
 	return b.String()
+}
+
+// FormatFPRSweep renders add-scenario comparisons across false positive targets.
+func FormatFPRSweep(cfg Config, rates []float64, results []Comparison) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Bloom filter vs hash set — FPR sweep (n=%d, add workload)\n\n", cfg.ItemCount)
+
+	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "TARGET p\tBLOOM B/item\tHASHSET B/item\tSPACE\tBLOOM ns/op\tHASHSET ns/op\tSPEEDUP\tBLOOM allocs/op\tHASHSET allocs/op\tALLOCS")
+	for i, cmp := range results {
+		fmt.Fprintf(tw, "%.4f\t%.1f\t%.1f\t%.1fx\t%.0f\t%.0f\t%.2fx\t%.2f\t%.2f\t%.1fx\n",
+			rates[i],
+			cmp.Bloom.BytesPerItem,
+			cmp.HashSet.BytesPerItem,
+			cmp.SpaceRatio(),
+			cmp.Bloom.NsPerOp,
+			cmp.HashSet.NsPerOp,
+			cmp.SpeedRatio(),
+			cmp.Bloom.AllocsPerOp,
+			cmp.HashSet.AllocsPerOp,
+			cmp.AllocRatio(),
+		)
+	}
+	_ = tw.Flush()
+
+	b.WriteString("\nLower p sizes the Bloom filter larger (more bits, lower FPR). Hash set footprint is unchanged.\n")
+	return b.String()
+}
+
+// FormatFPRSweepMarkdown renders the FPR sweep as a markdown table.
+func FormatFPRSweepMarkdown(cfg Config, rates []float64, results []Comparison) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Bloom filter vs hash set — FPR sweep\n\n")
+	fmt.Fprintf(&b, "Add workload at `n=%d` across target false positive rates.\n\n", cfg.ItemCount)
+	fmt.Fprintln(&b, "| Target p | Bloom B/item | Hash set B/item | Space ratio | Bloom ns/op | Hash set ns/op | Speedup | Bloom allocs/op | Hash set allocs/op | Alloc ratio |")
+	fmt.Fprintln(&b, "|----------|--------------|-----------------|-------------|-------------|----------------|---------|-----------------|--------------------|-------------|")
+	for i, cmp := range results {
+		fmt.Fprintf(&b, "| %.4f | %.1f | %.1f | %.1fx | %.0f | %.0f | %.2fx | %.2f | %.2f | %.1fx |\n",
+			rates[i],
+			cmp.Bloom.BytesPerItem,
+			cmp.HashSet.BytesPerItem,
+			cmp.SpaceRatio(),
+			cmp.Bloom.NsPerOp,
+			cmp.HashSet.NsPerOp,
+			cmp.SpeedRatio(),
+			cmp.Bloom.AllocsPerOp,
+			cmp.HashSet.AllocsPerOp,
+			cmp.AllocRatio(),
+		)
+	}
+	return b.String()
+}
+
+func formatNotes(cmp Comparison) string {
+	notes := ""
+	if cmp.Bloom.TheoryFPR > 0 && cmp.Scenario != ScenarioMixedStream {
+		notes = fmt.Sprintf("theory FPR %.3f%%", cmp.Bloom.TheoryFPR*100)
+	}
+	if cmp.Scenario == ScenarioMixedStream {
+		notes = fmt.Sprintf("dup calls bloom=%d hashset=%d", cmp.Bloom.FalsePositives, cmp.HashSet.FalsePositives)
+	}
+	return notes
 }

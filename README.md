@@ -157,7 +157,7 @@ Bloom filters trade exact membership and per-insert heap allocations for a fixed
 
 ### benchcompare subsystem
 
-The `benchcompare` package runs paired workloads (add, contains hit/miss, and mixed stream dedup) against a Bloom filter and a hash set, then reports throughput and bytes-per-item side by side:
+The `benchcompare` package runs paired workloads (add, contains hit/miss, and mixed stream dedup) against a Bloom filter and a hash set, then reports throughput, bytes-per-item, and heap allocations side by side:
 
 ```bash
 # Full comparison table at default sizing (100k items, 1% FPR)
@@ -165,6 +165,13 @@ go run ./cmd/benchcompare
 
 # Smaller run for quick local checks
 go run ./cmd/benchcompare -n 10000 -repeats 2
+
+# Sweep false positive targets to see Bloom sizing trade-offs (hash set unchanged)
+go run ./cmd/benchcompare -sweep-fpr -n 50000
+go run ./cmd/benchcompare -sweep-fpr -p-values 0.001,0.01,0.05,0.1 -markdown
+
+# Compare hash strategies (Bloom only; hash set ignores -hash/-seed)
+go run ./cmd/benchcompare -hash murmur3 -seed 42 -n 10000
 
 # Markdown table for docs or CI artifacts
 go run ./cmd/benchcompare -markdown > docs/benchcompare.md
