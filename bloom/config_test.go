@@ -24,6 +24,11 @@ func TestConfigValidate(t *testing.T) {
 			wantErr: nil,
 		},
 		{
+			name:    "explicit zero bits",
+			cfg:     ExplicitConfig(0, 4),
+			wantErr: ErrInvalidBits,
+		},
+		{
 			name:    "zero capacity",
 			cfg:     TargetConfig(0, 0.01),
 			wantErr: ErrInvalidCapacity,
@@ -157,6 +162,26 @@ func TestNewCountingFilterFromConfig(t *testing.T) {
 	}
 	if cf.BitCount() != 64 || cf.HashCount() != 3 {
 		t.Errorf("BitCount=%d HashCount=%d", cf.BitCount(), cf.HashCount())
+	}
+}
+
+func TestConfigOptions(t *testing.T) {
+	cfg := TargetConfig(1000, 0.01, WithHash(HashMurmur3), WithSeed(42))
+	if cfg.Hash.Strategy != HashMurmur3 || cfg.Hash.Seed != 42 {
+		t.Fatalf("Hash = %+v, want murmur3 seed=42", cfg.Hash)
+	}
+	h := cfg.Hasher()
+	if h.Strategy() != HashMurmur3 {
+		t.Fatalf("Hasher strategy = %v, want murmur3", h.Strategy())
+	}
+}
+
+func TestHashConfigString(t *testing.T) {
+	if got := (HashConfig{}).String(); got != "fnv" {
+		t.Errorf("default HashConfig.String() = %q, want fnv", got)
+	}
+	if got := (HashConfig{Strategy: HashMurmur3, Seed: 7}).String(); got != "murmur3 seed=7" {
+		t.Errorf("seeded HashConfig.String() = %q", got)
 	}
 }
 

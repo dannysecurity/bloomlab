@@ -9,6 +9,7 @@ import (
 var (
 	ErrInvalidCapacity = errors.New("bloom: capacity must be positive")
 	ErrInvalidFPR      = errors.New("bloom: false positive rate must be in (0, 1)")
+	ErrInvalidBits     = errors.New("bloom: bit count must be positive")
 )
 
 const (
@@ -16,8 +17,49 @@ const (
 	defaultMaxHashCount uint   = 32
 )
 
+// HashConfig selects how keys are hashed into bit positions. Sizing and hashing
+// are independent: hash settings do not affect m or k.
+type HashConfig struct {
+	// Strategy selects the hash family for double hashing. Zero means HashFNV.
+	Strategy Strategy
+	// Seed seeds keyed hashing; use distinct seeds for independent filters.
+	Seed uint64
+}
+
+// Hasher returns the configured hash implementation.
+func (h HashConfig) Hasher() Hasher {
+	return NewHasher(h.Strategy, h.Seed)
+}
+
+// String returns a short hash summary for debugging and CLI output.
+func (h HashConfig) String() string {
+	name := h.Strategy.String()
+	if h.Seed != 0 {
+		return fmt.Sprintf("%s seed=%d", name, h.Seed)
+	}
+	return name
+}
+
+// ConfigOption customizes a Config after sizing fields are set.
+type ConfigOption func(*Config)
+
+// WithHash sets the hash strategy on a config.
+func WithHash(strategy Strategy) ConfigOption {
+	return func(c *Config) {
+		c.Hash.Strategy = strategy
+	}
+}
+
+// WithSeed sets the hash seed on a config.
+func WithSeed(seed uint64) ConfigOption {
+	return func(c *Config) {
+		c.Hash.Seed = seed
+	}
+}
+
 // Config describes how a Bloom filter is sized. Use TargetConfig for the
 // standard capacity/FPR formulas, or ExplicitConfig for fixed m and k.
+// Hash settings live in Config.Hash and can be supplied via WithHash and WithSeed.
 type Config struct {
 	ExpectedCapacity  uint64
 	FalsePositiveRate float64
@@ -30,34 +72,38 @@ type Config struct {
 	MinBits      uint64
 	MaxHashCount uint
 
-	// HashStrategy selects the hash family for double hashing. Zero means HashFNV.
-	HashStrategy Strategy
-	// HashSeed seeds keyed hashing; use distinct seeds for independent filters.
-	HashSeed uint64
+	Hash HashConfig
 }
 
 // TargetConfig returns a Config that derives m and k from expected capacity
 // and false positive rate using the standard Bloom filter formulas.
-func TargetConfig(expectedCapacity uint64, falsePositiveRate float64) Config {
-	return Config{
+func TargetConfig(expectedCapacity uint64, falsePositiveRate float64, opts ...ConfigOption) Config {
+	cfg := Config{
 		ExpectedCapacity:  expectedCapacity,
 		FalsePositiveRate: falsePositiveRate,
 	}
+	applyOptions(&cfg, opts)
+	return cfg
 }
 
 // ExplicitConfig returns a Config with fixed bit count and hash functions.
 // HashCount of zero is treated as one at construction time.
-func ExplicitConfig(bits uint64, hashCount uint) Config {
-	return Config{
+func ExplicitConfig(bits uint64, hashCount uint, opts ...ConfigOption) Config {
+	cfg := Config{
 		Bits:      bits,
 		HashCount: hashCount,
 	}
+	applyOptions(&cfg, opts)
+	return cfg
 }
 
 // Validate checks that the configuration is usable.
 func (c Config) Validate() error {
 	if c.Bits != 0 {
 		return nil
+	}
+	if c.HashCount > 0 && c.ExpectedCapacity == 0 && c.FalsePositiveRate == 0 {
+		return ErrInvalidBits
 	}
 	if c.ExpectedCapacity == 0 {
 		return ErrInvalidCapacity
@@ -90,7 +136,7 @@ func (c Config) Size() (m uint64, k uint, err error) {
 
 // Hasher returns the configured hash implementation.
 func (c Config) Hasher() Hasher {
-	return NewHasher(c.HashStrategy, c.HashSeed)
+	return c.Hash.Hasher()
 }
 
 // String summarizes the resolved sizing for debugging and CLI output.
@@ -99,14 +145,17 @@ func (c Config) String() string {
 	if err != nil {
 		return fmt.Sprintf("invalid config: %v", err)
 	}
-	hash := c.HashStrategy.String()
-	if c.HashSeed != 0 {
-		hash = fmt.Sprintf("%s seed=%d", hash, c.HashSeed)
-	}
+	hash := c.Hash.String()
 	if c.Bits != 0 {
 		return fmt.Sprintf("explicit m=%d k=%d hash=%s", m, k, hash)
 	}
 	return fmt.Sprintf("target n=%d p=%g -> m=%d k=%d hash=%s", c.ExpectedCapacity, c.FalsePositiveRate, m, k, hash)
+}
+
+func applyOptions(cfg *Config, opts []ConfigOption) {
+	for _, opt := range opts {
+		opt(cfg)
+	}
 }
 
 func (c Config) bounds() (minBits uint64, maxK uint) {

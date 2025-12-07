@@ -85,12 +85,12 @@ func TestCountingFilterInvalidParams(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "NewCounting zero capacity",
+			name: "NewCounting zero bits",
 			newFn: func() error {
 				_, err := NewCounting(0, 4)
 				return err
 			},
-			wantErr: ErrInvalidCapacity,
+			wantErr: ErrInvalidBits,
 		},
 		{
 			name: "NewCountingFromTarget zero capacity",

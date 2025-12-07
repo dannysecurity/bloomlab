@@ -23,8 +23,7 @@ func BenchmarkHasherDeriveMurmur3(b *testing.B) {
 }
 
 func BenchmarkFilterAddMurmur3(b *testing.B) {
-	cfg := TargetConfig(100_000, 0.01)
-	cfg.HashStrategy = HashMurmur3
+	cfg := TargetConfig(100_000, 0.01, WithHash(HashMurmur3))
 	f, _ := NewFilter(cfg)
 	key := []byte("benchmark-key")
 	b.ResetTimer()

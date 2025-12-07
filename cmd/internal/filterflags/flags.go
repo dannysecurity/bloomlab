@@ -30,8 +30,9 @@ func (f *Flags) Config() (bloom.Config, error) {
 	if err != nil {
 		return bloom.Config{}, err
 	}
-	cfg := bloom.TargetConfig(*f.Capacity, *f.FPR)
-	cfg.HashStrategy = strategy
-	cfg.HashSeed = *f.Seed
-	return cfg, nil
+	opts := []bloom.ConfigOption{bloom.WithHash(strategy)}
+	if *f.Seed != 0 {
+		opts = append(opts, bloom.WithSeed(*f.Seed))
+	}
+	return bloom.TargetConfig(*f.Capacity, *f.FPR, opts...), nil
 }

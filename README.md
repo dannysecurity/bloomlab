@@ -17,7 +17,7 @@ go get github.com/dannysecurity/bloomlab
 
 ## Quick start
 
-Configuration is expressed through `bloom.Config`, which both filter types share:
+Configuration is expressed through `bloom.Config`, which both filter types share. Sizing and hashing are configured separately — hash settings do not affect `m` or `k`:
 
 ```go
 package main
@@ -34,6 +34,16 @@ func main() {
 	fmt.Println(f.Contains([]byte("user:42"))) // true
 	fmt.Println(cfg.String())                  // target n=10000 p=0.01 -> m=... k=...
 }
+```
+
+Pass hash settings as options instead of mutating the config after construction:
+
+```go
+cfg := bloom.TargetConfig(10_000, 0.01,
+	bloom.WithHash(bloom.HashMurmur3),
+	bloom.WithSeed(42),
+)
+f, _ := bloom.NewFilter(cfg)
 ```
 
 Shorthand constructors remain available:
@@ -151,8 +161,10 @@ Bloom filters trade exact membership and per-insert heap allocations for a fixed
 
 | Helper | Use when |
 |--------|----------|
-| `TargetConfig(n, p)` | Derive `m` and `k` from expected capacity and FPR |
-| `ExplicitConfig(m, k)` | Fix bit count and hash functions directly |
+| `TargetConfig(n, p, opts...)` | Derive `m` and `k` from expected capacity and FPR |
+| `ExplicitConfig(m, k, opts...)` | Fix bit count and hash functions directly |
+| `WithHash(strategy)` / `WithSeed(seed)` | Set hash family and seed on any config |
+| `HashConfig` | Hash-only settings (`Strategy`, `Seed`); embedded in `Config.Hash` |
 | `TheoryFalsePositiveRate(n, m, k)` | Theoretical FPR after `n` inserts |
 | `Config.TheoryFPRAt(n)` | FPR for a config at a given insert count |
 | `Filter.TheoryFPR()` / `CountingFilter.TheoryFPR()` | FPR at current insert count |
@@ -169,7 +181,7 @@ See [False positive rate](#false-positive-rate) for the full `p ≈ (1 - e^(-kn/
 
 ### Hashing
 
-Bit positions use **double hashing**: `h(i) = (h1 + i·h2) mod m`. The package provides pluggable hash strategies via `Config.HashStrategy` and `Config.HashSeed`:
+Bit positions use **double hashing**: `h(i) = (h1 + i·h2) mod m`. Hash settings live in `Config.Hash` and can be supplied via `WithHash` and `WithSeed`:
 
 | Strategy | Name | Notes |
 |----------|------|-------|
@@ -177,10 +189,10 @@ Bit positions use **double hashing**: `h(i) = (h1 + i·h2) mod m`. The package p
 | `HashMurmur3` | `murmur3` | MurmurHash3 64-bit with independent seeds for `h1`/`h2` |
 
 ```go
-cfg := bloom.TargetConfig(10_000, 0.01)
-cfg.HashStrategy = bloom.HashMurmur3
-cfg.HashSeed = 42
-f, _ := bloom.NewFilter(cfg)
+f, _ := bloom.NewFilter(bloom.TargetConfig(10_000, 0.01,
+	bloom.WithHash(bloom.HashMurmur3),
+	bloom.WithSeed(42),
+))
 ```
 
 When `m` is a power of two, indexing uses a bitmask fast path instead of modulo. Changing strategy or seed changes bit positions — filters are not interoperable across hash settings.

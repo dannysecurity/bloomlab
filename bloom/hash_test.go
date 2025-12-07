@@ -202,8 +202,7 @@ func TestFalsePositiveRatePerStrategy(t *testing.T) {
 
 	for _, strategy := range []Strategy{HashFNV, HashMurmur3} {
 		t.Run(strategy.String(), func(t *testing.T) {
-			cfg := TargetConfig(n, 0.01)
-			cfg.HashStrategy = strategy
+			cfg := TargetConfig(n, 0.01, WithHash(strategy))
 			f, err := NewFilter(cfg)
 			if err != nil {
 				t.Fatal(err)
@@ -236,9 +235,7 @@ func TestConfigHasherDefaultIsFNV(t *testing.T) {
 }
 
 func TestFilterHashStrategyWiring(t *testing.T) {
-	cfg := ExplicitConfig(256, 4)
-	cfg.HashStrategy = HashMurmur3
-	cfg.HashSeed = 7
+	cfg := ExplicitConfig(256, 4, WithHash(HashMurmur3), WithSeed(7))
 
 	f, err := NewFilter(cfg)
 	if err != nil {
