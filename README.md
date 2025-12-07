@@ -7,7 +7,8 @@ A Go toolkit for [Bloom filters](https://en.wikipedia.org/wiki/Bloom_filter): sp
 - **Standard Bloom filter** (`bloom.Filter`) — fixed-size bit array, optimal `m` and `k` from target capacity and FPR
 - **Counting Bloom filter** (`bloom.CountingFilter`) — supports deletion via per-bit counters
 - **Benchmarks** — add, lookup, and remove throughput
-- **Demo CLIs** — `bloomdemo`, `countingdemo`, and `urldedup` for interactive exploration
+- **benchcompare** — programmatic Bloom filter vs `map[string]struct{}` comparison with CLI and Go benchmarks
+- **Demo CLIs** — `bloomdemo`, `countingdemo`, `urldedup`, and `benchcompare` for interactive exploration
 
 ## Install
 
@@ -153,6 +154,35 @@ go test -bench=Footprint -benchmem ./bloom/
 ```
 
 Bloom filters trade exact membership and per-insert heap allocations for a fixed bit slice; hash sets allocate per key but offer O(1) exact lookups with lower constant factors.
+
+### benchcompare subsystem
+
+The `benchcompare` package runs paired workloads (add, contains hit/miss, and mixed stream dedup) against a Bloom filter and a hash set, then reports throughput and bytes-per-item side by side:
+
+```bash
+# Full comparison table at default sizing (100k items, 1% FPR)
+go run ./cmd/benchcompare
+
+# Smaller run for quick local checks
+go run ./cmd/benchcompare -n 10000 -repeats 2
+
+# Markdown table for docs or CI artifacts
+go run ./cmd/benchcompare -markdown > docs/benchcompare.md
+```
+
+Programmatic use:
+
+```go
+results, _ := benchcompare.Compare(benchcompare.DefaultConfig())
+fmt.Print(benchcompare.FormatReport(benchcompare.DefaultConfig(), results))
+```
+
+Go benchmarks in `benchcompare/` reuse the same measurement helpers:
+
+```bash
+go test -bench=. -benchmem ./benchcompare/
+go test -bench=ReportMetrics ./benchcompare/
+```
 
 ## API overview
 
