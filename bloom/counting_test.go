@@ -238,27 +238,10 @@ func TestCountingFilterAddRemoveProperty(t *testing.T) {
 
 func TestCountingFilterFalsePositiveRate(t *testing.T) {
 	const n = 5000
-	cf, err := NewCountingFromTarget(n, 0.01)
+	const trials = 5000
+	f, err := newCountingEmpiricalFilter(TargetConfig(n, 0.01))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	for i := 0; i < n; i++ {
-		if err := cf.Add([]byte{byte(i >> 8), byte(i)}); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	falsePositives := 0
-	const trials = 5000
-	for i := n; i < n+trials; i++ {
-		if cf.Contains([]byte{byte(i >> 8), byte(i)}) {
-			falsePositives++
-		}
-	}
-
-	rate := float64(falsePositives) / trials
-	if rate > 0.05 {
-		t.Errorf("false positive rate %.4f exceeds tolerance for p=0.01", rate)
-	}
+	assertEmpiricalFPR(t, f, n, trials, 0.05)
 }

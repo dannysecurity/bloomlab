@@ -196,37 +196,6 @@ func TestHashDistribution(t *testing.T) {
 	})
 }
 
-func TestFalsePositiveRatePerStrategy(t *testing.T) {
-	const n = 5000
-	const trials = 5000
-
-	for _, strategy := range []Strategy{HashFNV, HashMurmur3} {
-		t.Run(strategy.String(), func(t *testing.T) {
-			cfg := TargetConfig(n, 0.01, WithHash(strategy))
-			f, err := NewFilter(cfg)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			for i := 0; i < n; i++ {
-				f.Add([]byte{byte(i >> 8), byte(i)})
-			}
-
-			falsePositives := 0
-			for i := n; i < n+trials; i++ {
-				if f.Contains([]byte{byte(i >> 8), byte(i)}) {
-					falsePositives++
-				}
-			}
-
-			rate := float64(falsePositives) / trials
-			if rate > 0.05 {
-				t.Errorf("false positive rate %.4f exceeds tolerance for p=0.01", rate)
-			}
-		})
-	}
-}
-
 func TestConfigHasherDefaultIsFNV(t *testing.T) {
 	h := TargetConfig(100, 0.01).Hasher()
 	if h.Strategy() != HashFNV {

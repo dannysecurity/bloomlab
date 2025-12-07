@@ -105,25 +105,10 @@ func TestFilterAddContainsProperty(t *testing.T) {
 
 func TestFalsePositiveRate(t *testing.T) {
 	const n = 5000
-	f, err := New(n, 0.01)
+	const trials = 5000
+	f, err := newStandardEmpiricalFilter(TargetConfig(n, 0.01))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	for i := 0; i < n; i++ {
-		f.Add([]byte{byte(i >> 8), byte(i)})
-	}
-
-	falsePositives := 0
-	const trials = 5000
-	for i := n; i < n+trials; i++ {
-		if f.Contains([]byte{byte(i >> 8), byte(i)}) {
-			falsePositives++
-		}
-	}
-
-	rate := float64(falsePositives) / trials
-	if rate > 0.05 {
-		t.Errorf("false positive rate %.4f exceeds tolerance for p=0.01", rate)
-	}
+	assertEmpiricalFPR(t, f, n, trials, 0.05)
 }
