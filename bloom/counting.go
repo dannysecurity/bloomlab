@@ -97,6 +97,14 @@ func (cf *CountingFilter) BitCount() uint64 { return cf.m }
 // HashCount returns k.
 func (cf *CountingFilter) HashCount() uint { return cf.k }
 
+// Clear resets all counters and insert tracking. m, k, and the hasher are unchanged.
+func (cf *CountingFilter) Clear() {
+	for i := range cf.counters {
+		cf.counters[i] = 0
+	}
+	cf.n = 0
+}
+
 // FillRatio returns the fraction of counters that are non-zero.
 func (cf *CountingFilter) FillRatio() float64 {
 	var occupied uint64

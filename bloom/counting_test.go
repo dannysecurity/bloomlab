@@ -54,6 +54,48 @@ func TestCountingFilterOverflow(t *testing.T) {
 	}
 }
 
+func TestCountingFilterClear(t *testing.T) {
+	cf, err := NewCountingFromTarget(64, 0.05)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keys := [][]byte{[]byte("a"), []byte("b")}
+	for _, key := range keys {
+		if err := cf.Add(key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if cf.ApproximateCount() != 2 {
+		t.Fatalf("before clear count = %d, want 2", cf.ApproximateCount())
+	}
+
+	cf.Clear()
+
+	if cf.ApproximateCount() != 0 {
+		t.Errorf("after clear count = %d, want 0", cf.ApproximateCount())
+	}
+	if cf.FillRatio() != 0 {
+		t.Errorf("after clear fill ratio = %v, want 0", cf.FillRatio())
+	}
+	for _, key := range keys {
+		if cf.Contains(key) {
+			t.Errorf("Contains(%q) = true after clear, want false", key)
+		}
+	}
+	if cf.TheoryFPR() != 0 {
+		t.Errorf("TheoryFPR() = %v after clear, want 0", cf.TheoryFPR())
+	}
+
+	// Filter remains usable after clear.
+	if err := cf.Add(keys[0]); err != nil {
+		t.Fatal(err)
+	}
+	if !cf.Contains(keys[0]) {
+		t.Error("expected key present after re-add post-clear")
+	}
+}
+
 func TestCountingFilterFillRatio(t *testing.T) {
 	cf, err := NewCounting(64, 2)
 	if err != nil {

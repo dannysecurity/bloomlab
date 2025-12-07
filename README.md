@@ -189,7 +189,7 @@ go test -bench=ReportMetrics ./benchcompare/
 | Type | Add | Contains | Remove | Notes |
 |------|-----|----------|--------|-------|
 | `Filter` | ✓ | ✓ | — | Classic bit-slice Bloom filter |
-| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters; overflow at 255; `ApproximateCount`, `TheoryFPR`, `FillRatio` |
+| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters; overflow at 255; `Clear`, `ApproximateCount`, `TheoryFPR`, `FillRatio` |
 
 ### Configuration
 
