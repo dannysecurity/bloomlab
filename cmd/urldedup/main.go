@@ -13,6 +13,7 @@ import (
 func main() {
 	flags := filterflags.Register(100_000)
 	quiet := flag.Bool("quiet", false, "print summary only")
+	normalize := flag.Bool("normalize", false, "canonicalize URLs (scheme/host case, default ports, trailing slashes, fragments)")
 	flag.Parse()
 
 	cfg, err := flags.Config()
@@ -32,11 +33,13 @@ func main() {
 		os.Exit(2)
 	}
 
+	opts := dedupOptions{normalize: *normalize}
+
 	scanner := bufio.NewScanner(os.Stdin)
 	var novel, dup int
 	for scanner.Scan() {
 		line := scanner.Text()
-		isDup, ok := classify(f, line)
+		isDup, ok := classify(f, line, opts)
 		if !ok {
 			continue
 		}

@@ -134,6 +134,9 @@ go run ./cmd/countingdemo -remove alpha
 # Stream deduper — classify stdin lines as new or duplicate (URLs, logs, etc.)
 printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/urldedup
 printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/urldedup -quiet
+
+# URL dedup with canonicalization (case, ports, trailing slashes, fragments)
+printf '%s\n' 'https://Example.com/' 'http://example.com:80' | go run ./cmd/urldedup -normalize
 ```
 
 ## Tests & benchmarks
