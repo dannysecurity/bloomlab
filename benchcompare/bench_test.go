@@ -41,6 +41,15 @@ func BenchmarkCompareMixedStream(b *testing.B) {
 	}
 }
 
+func BenchmarkCompareRemove(b *testing.B) {
+	cfg := smallBenchConfig()
+	for i := 0; i < b.N; i++ {
+		if _, err := compareRemove(cfg); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 // End-to-end benchmarks mirror cmd/benchcompare workloads at default sizing.
 func BenchmarkCompareAllDefault(b *testing.B) {
 	cfg := DefaultConfig()

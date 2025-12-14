@@ -156,6 +156,34 @@ func TestFormatFPRSweep(t *testing.T) {
 	}
 }
 
+func TestCompareRemoveUsesCountingFilter(t *testing.T) {
+	cfg := Config{
+		ItemCount:         500,
+		FalsePositiveRate: 0.01,
+		LookupRepeats:     1,
+	}
+	results, err := Compare(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var remove Comparison
+	for _, cmp := range results {
+		if cmp.Scenario == ScenarioRemove {
+			remove = cmp
+			break
+		}
+	}
+	if remove.Bloom.NsPerOp <= 0 {
+		t.Fatal("remove: bloom ns/op must be positive")
+	}
+	if remove.HashSet.NsPerOp <= 0 {
+		t.Fatal("remove: hashset ns/op must be positive")
+	}
+	if remove.Bloom.BytesPerItem <= 0 {
+		t.Fatal("remove: bloom bytes/item must be positive")
+	}
+}
+
 func TestCompareMixedStreamDetectsDuplicates(t *testing.T) {
 	cfg := Config{
 		ItemCount:         100,

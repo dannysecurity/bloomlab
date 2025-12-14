@@ -15,6 +15,8 @@ const (
 	ScenarioContainsMiss Scenario = "contains_miss"
 	// ScenarioMixedStream simulates stream dedup: check each key, insert on first sight.
 	ScenarioMixedStream Scenario = "mixed_stream"
+	// ScenarioRemove measures delete throughput using a counting Bloom filter vs map delete.
+	ScenarioRemove Scenario = "remove"
 )
 
 // AllScenarios lists workloads reported by Compare and the benchcompare CLI.
@@ -23,6 +25,7 @@ var AllScenarios = []Scenario{
 	ScenarioContainsHit,
 	ScenarioContainsMiss,
 	ScenarioMixedStream,
+	ScenarioRemove,
 }
 
 // Config controls sizing and iteration count for a comparison run.

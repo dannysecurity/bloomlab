@@ -160,7 +160,7 @@ Bloom filters trade exact membership and per-insert heap allocations for a fixed
 
 ### benchcompare subsystem
 
-The `benchcompare` package runs paired workloads (add, contains hit/miss, and mixed stream dedup) against a Bloom filter and a hash set, then reports throughput, bytes-per-item, and heap allocations side by side:
+The `benchcompare` package runs paired workloads (add, contains hit/miss, mixed stream dedup, and counting-filter remove) against a Bloom filter and a hash set, then reports throughput, bytes-per-item, and heap allocations side by side:
 
 ```bash
 # Full comparison table at default sizing (100k items, 1% FPR)
@@ -199,7 +199,7 @@ go test -bench=ReportMetrics ./benchcompare/
 | Type | Add | Contains | Remove | Notes |
 |------|-----|----------|--------|-------|
 | `Filter` | ✓ | ✓ | — | Classic bit-slice Bloom filter |
-| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters; overflow at 255; `Clear`, `ApproximateCount`, `TheoryFPR`, `FillRatio` |
+| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters; overflow at 255; `Clear`, `CounterBytes`, `ApproximateCount`, `TheoryFPR`, `FillRatio` |
 
 ### Configuration
 

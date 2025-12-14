@@ -41,6 +41,8 @@ func compareScenario(cfg Config, sc Scenario) (Comparison, error) {
 		return compareContainsMiss(cfg)
 	case ScenarioMixedStream:
 		return compareMixedStream(cfg)
+	case ScenarioRemove:
+		return compareRemove(cfg)
 	default:
 		return Comparison{}, fmt.Errorf("benchcompare: unknown scenario %q", sc)
 	}
@@ -314,6 +316,79 @@ func compareMixedStream(cfg Config) (Comparison, error) {
 			BytesPerItem:   hashBytes / float64(len(set)),
 			AllocsPerOp:    hashAllocs,
 			FalsePositives: hashFP,
+		},
+	}, nil
+}
+
+func compareRemove(cfg Config) (Comparison, error) {
+	keys := makeKeys(cfg.ItemCount)
+
+	cf, err := bloom.NewCountingFilter(cfg.targetBloomConfig())
+	if err != nil {
+		return Comparison{}, err
+	}
+	set := make(map[string]struct{}, int(cfg.ItemCount))
+	for _, key := range keys {
+		if err := cf.Add(key); err != nil {
+			return Comparison{}, err
+		}
+		set[string(key)] = struct{}{}
+	}
+
+	bloomBytes := float64(cf.CounterBytes())
+	hashBytes := mapHeapBytes(set)
+
+	bloomStart := time.Now()
+	for _, key := range keys {
+		cf.Remove(key)
+	}
+	bloomElapsed := time.Since(bloomStart)
+
+	hashStart := time.Now()
+	for _, key := range keys {
+		delete(set, string(key))
+	}
+	hashElapsed := time.Since(hashStart)
+
+	n := len(keys)
+
+	bloomAllocs := allocsPerOp(n, func() {
+		ff, err := bloom.NewCountingFilter(cfg.targetBloomConfig())
+		if err != nil {
+			panic(err)
+		}
+		for _, key := range keys {
+			if err := ff.Add(key); err != nil {
+				panic(err)
+			}
+		}
+		for _, key := range keys {
+			ff.Remove(key)
+		}
+	})
+	hashAllocs := allocsPerOp(n, func() {
+		ss := make(map[string]struct{}, int(cfg.ItemCount))
+		for _, key := range keys {
+			ss[string(key)] = struct{}{}
+		}
+		for _, key := range keys {
+			delete(ss, string(key))
+		}
+	})
+
+	nf := float64(n)
+	return Comparison{
+		Scenario: ScenarioRemove,
+		Bloom: BackendResult{
+			NsPerOp:      float64(bloomElapsed.Nanoseconds()) / nf,
+			BytesPerItem: bloomBytes / nf,
+			AllocsPerOp:  bloomAllocs,
+			TheoryFPR:    cf.TheoryFPR(),
+		},
+		HashSet: BackendResult{
+			NsPerOp:      float64(hashElapsed.Nanoseconds()) / nf,
+			BytesPerItem: hashBytes / nf,
+			AllocsPerOp:  hashAllocs,
 		},
 	}, nil
 }

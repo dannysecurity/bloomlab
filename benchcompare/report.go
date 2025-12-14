@@ -134,5 +134,11 @@ func formatNotes(cmp Comparison) string {
 	if cmp.Scenario == ScenarioMixedStream {
 		notes = fmt.Sprintf("dup calls bloom=%d hashset=%d", cmp.Bloom.FalsePositives, cmp.HashSet.FalsePositives)
 	}
+	if cmp.Scenario == ScenarioRemove {
+		if notes != "" {
+			notes += "; "
+		}
+		notes += "counting bloom filter"
+	}
 	return notes
 }

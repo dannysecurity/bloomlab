@@ -5,6 +5,16 @@ import (
 	"testing/quick"
 )
 
+func TestCountingFilterCounterBytes(t *testing.T) {
+	cf, err := NewCounting(128, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cf.CounterBytes(); got != 128 {
+		t.Fatalf("CounterBytes() = %d, want 128", got)
+	}
+}
+
 func TestCountingFilterAddRemove(t *testing.T) {
 	cf, err := NewCountingFromTarget(256, 0.01)
 	if err != nil {

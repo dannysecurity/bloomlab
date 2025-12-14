@@ -91,6 +91,9 @@ func (cf *CountingFilter) TheoryFPR() float64 {
 	return TheoryFalsePositiveRate(cf.n, cf.m, cf.k)
 }
 
+// CounterBytes returns the number of bytes backing the per-bit counters.
+func (cf *CountingFilter) CounterBytes() uint64 { return uint64(len(cf.counters)) }
+
 // BitCount returns m.
 func (cf *CountingFilter) BitCount() uint64 { return cf.m }
 
