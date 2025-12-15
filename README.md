@@ -259,7 +259,8 @@ go test -bench=ReportMetrics ./benchcompare/
 |--------|----------|
 | `TargetConfig(n, p, opts...)` | Derive `m` and `k` from expected capacity and FPR |
 | `ExplicitConfig(m, k, opts...)` | Fix bit count and hash functions directly |
-| `WithHash(strategy)` / `WithSeed(seed)` | Set hash family and seed on any config |
+| `WithHash(strategy)` / `WithSeed(seed)` / `WithHashConfig(h)` | Set hash family, seed, or full hash config |
+| `WithMinBits(m)` / `WithMaxHashCount(k)` | Bound derived sizing on target configs |
 | `HashConfig` | Hash-only settings (`Strategy`, `Seed`); embedded in `Config.Hash` |
 | `TheoryFalsePositiveRate(n, m, k)` | Theoretical FPR after `n` inserts |
 | `TheoryFillFraction(n, m, k)` | Expected fraction of bits set after `n` inserts |

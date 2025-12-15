@@ -54,22 +54,14 @@ func TestOptimalSizingBounds(t *testing.T) {
 		},
 		{
 			name: "custom min bits",
-			cfg: Config{
-				ExpectedCapacity:  50,
-				FalsePositiveRate: 0.25,
-				MinBits:           256,
-			},
+			cfg:  TargetConfig(50, 0.25, WithMinBits(256)),
 			minM: 256,
 			minK: 1,
 			maxK: defaultMaxHashCount,
 		},
 		{
 			name: "max hash cap",
-			cfg: Config{
-				ExpectedCapacity:  200_000,
-				FalsePositiveRate: 0.0001,
-				MaxHashCount:      10,
-			},
+			cfg:  TargetConfig(200_000, 0.0001, WithMaxHashCount(10)),
 			minM: defaultMinBits,
 			minK: 1,
 			maxK: 10,

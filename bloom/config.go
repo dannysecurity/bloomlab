@@ -57,9 +57,31 @@ func WithSeed(seed uint64) ConfigOption {
 	}
 }
 
+// WithHashConfig sets the full hash configuration on a config.
+func WithHashConfig(hash HashConfig) ConfigOption {
+	return func(c *Config) {
+		c.Hash = hash
+	}
+}
+
+// WithMinBits sets the minimum bit count for target-based sizing.
+func WithMinBits(minBits uint64) ConfigOption {
+	return func(c *Config) {
+		c.MinBits = minBits
+	}
+}
+
+// WithMaxHashCount caps the number of hash functions for target-based sizing.
+func WithMaxHashCount(maxK uint) ConfigOption {
+	return func(c *Config) {
+		c.MaxHashCount = maxK
+	}
+}
+
 // Config describes how a Bloom filter is sized. Use TargetConfig for the
 // standard capacity/FPR formulas, or ExplicitConfig for fixed m and k.
-// Hash settings live in Config.Hash and can be supplied via WithHash and WithSeed.
+// Hash settings live in Config.Hash and can be supplied via WithHash, WithSeed,
+// or WithHashConfig. Sizing bounds use WithMinBits and WithMaxHashCount.
 type Config struct {
 	ExpectedCapacity  uint64
 	FalsePositiveRate float64

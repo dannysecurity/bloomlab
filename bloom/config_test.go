@@ -174,6 +174,26 @@ func TestConfigOptions(t *testing.T) {
 	if h.Strategy() != HashMurmur3 {
 		t.Fatalf("Hasher strategy = %v, want murmur3", h.Strategy())
 	}
+
+	bounded := TargetConfig(100_000, 0.001, WithMinBits(256), WithMaxHashCount(8))
+	if bounded.MinBits != 256 || bounded.MaxHashCount != 8 {
+		t.Fatalf("bounds = minBits=%d maxK=%d, want 256 and 8", bounded.MinBits, bounded.MaxHashCount)
+	}
+	m, k, err := bounded.Size()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m < 256 {
+		t.Errorf("m = %d, want >= 256", m)
+	}
+	if k > 8 {
+		t.Errorf("k = %d, want <= 8", k)
+	}
+
+	hashCfg := TargetConfig(500, 0.01, WithHashConfig(HashConfig{Strategy: HashMurmur3, Seed: 9}))
+	if hashCfg.Hash.Strategy != HashMurmur3 || hashCfg.Hash.Seed != 9 {
+		t.Fatalf("WithHashConfig = %+v", hashCfg.Hash)
+	}
 }
 
 func TestHashConfigString(t *testing.T) {

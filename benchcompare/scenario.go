@@ -40,20 +40,8 @@ type Config struct {
 	Hash bloom.HashConfig
 }
 
-// bloomOptions returns functional options for bloom.TargetConfig.
-func (cfg Config) bloomOptions() []bloom.ConfigOption {
-	var opts []bloom.ConfigOption
-	if cfg.Hash.Strategy != 0 {
-		opts = append(opts, bloom.WithHash(cfg.Hash.Strategy))
-	}
-	if cfg.Hash.Seed != 0 {
-		opts = append(opts, bloom.WithSeed(cfg.Hash.Seed))
-	}
-	return opts
-}
-
 func (cfg Config) targetBloomConfig() bloom.Config {
-	return bloom.TargetConfig(cfg.ItemCount, cfg.FalsePositiveRate, cfg.bloomOptions()...)
+	return bloom.TargetConfig(cfg.ItemCount, cfg.FalsePositiveRate, bloom.WithHashConfig(cfg.Hash))
 }
 
 // DefaultConfig returns settings aligned with bloom/bloom_bench_test.go.
