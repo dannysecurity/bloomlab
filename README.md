@@ -8,7 +8,7 @@ A Go toolkit for [Bloom filters](https://en.wikipedia.org/wiki/Bloom_filter): sp
 - **Counting Bloom filter** (`bloom.CountingFilter`) — supports deletion via per-bit counters
 - **Benchmarks** — add, lookup, and remove throughput
 - **benchcompare** — programmatic Bloom filter vs `map[string]struct{}` comparison with CLI and Go benchmarks
-- **Demo CLIs** — `bloomdemo`, `countingdemo`, `urldedup`, and `benchcompare` for interactive exploration
+- **Demo CLIs** — `bloomdemo`, `countingdemo`, `urldedup`, `fprcalc`, and `benchcompare` for interactive exploration
 
 ## Install
 
@@ -82,7 +82,18 @@ After inserting `n` distinct keys, query a key known to be absent. Each of the `
 p ≈ (1 - e^(-kn/m))^k
 ```
 
+Equivalently, let `f ≈ 1 - e^(-kn/m)` be the **fill fraction** (expected share of bits set to 1). Then `p ≈ f^k`: a miss must land on `k` already-set bits.
+
 There are no false negatives: if a key was inserted, `Contains` always returns true.
+
+### Derivation (step by step)
+
+1. **One bit stays clear.** Each insert touches `k` of `m` bits. Under independence, the probability a given bit is *not* set by one insert is `(1 - 1/m)^k ≈ e^(-k/m)`.
+2. **After `n` inserts.** Repeating `n` times: `P(clear) ≈ e^(-kn/m)`.
+3. **Fill fraction.** `f = P(set) ≈ 1 - e^(-kn/m)`. bloomlab exposes this as `TheoryFillFraction(n, m, k)`.
+4. **False positive on a miss.** A query probes `k` positions; all must be set: `p ≈ f^k = (1 - e^(-kn/m))^k`. This is `TheoryFalsePositiveRate(n, m, k)`.
+
+At optimal sizing, `f ≈ 1/2` and `p ≈ (1/2)^k`.
 
 ### Sizing formulas
 
@@ -93,6 +104,40 @@ Given target capacity `n` and desired FPR upper bound `p`, bloomlab picks `m` (b
 
 This `(m, k)` pair is optimal for fixed `n` and `m`: the achieved rate is close to `(1/2)^k`. The formulas appear in `optimalM` / `optimalK` inside `bloom/config.go`.
 
+To derive `m`: substitute the continuous optimum `k* = (m/n) ln 2` into `p ≈ (1/2)^(m/n ln 2)` and solve for `m`.
+
+`PlanSizing(n, p)` resolves `(m, k)` and reports the achieved theoretical FPR and fill fraction at capacity in one call.
+
+### Worked example (`n = 10_000`, `p = 0.01`)
+
+| Quantity | Value |
+|----------|-------|
+| Target capacity `n` | 10,000 |
+| Target FPR `p` | 0.01 (1%) |
+| Bits `m` | 95,850 (~9.6 bits/item) |
+| Hash functions `k` | 6 |
+| Fill fraction `f` at capacity | ≈ 0.465 (46.5%) |
+| Achieved theory FPR | ≈ 0.0101 (1.01%) |
+
+Check with the library or CLI:
+
+```bash
+go run ./cmd/fprcalc -n 10000 -p 0.01
+```
+
+```go
+plan, _ := bloom.PlanSizing(10_000, 0.01)
+fmt.Println(plan)
+// target n=10000 p=0.01 -> m=95850 (9.59 bits/item) k=6
+// at capacity: fill≈0.465 (46.5%), theory FPR≈0.01014 (1.014%)
+```
+
+Probe FPR after a different insert count without rebuilding sizing:
+
+```bash
+go run ./cmd/fprcalc -n 10000 -p 0.01 -at 15000
+```
+
 ### Theory vs. practice
 
 | Factor | Effect on FPR |
@@ -101,22 +146,25 @@ This `(m, k)` pair is optimal for fixed `n` and `m`: the achieved rate is close 
 | `MinBits` floor | Forces larger `m` than the formula → lower FPR than target |
 | `MaxHashCount` cap | Limits `k` → can exceed target FPR |
 | Hash quality | Poor mixing can deviate from the independence model |
+| Integer rounding | Truncating `m` and `k` can push theory slightly above `p` (≤ ~20% in tests) |
 
-Use `TheoryFalsePositiveRate(n, m, k)` to evaluate a sizing plan, `Config.TheoryFPRAt(n)` before construction, or `Filter.TheoryFPR()` at runtime:
+Use `TheoryFalsePositiveRate(n, m, k)` to evaluate a sizing plan, `TheoryFillFraction(n, m, k)` for expected bit density, `Config.TheoryFPRAt(n)` before construction, or `Filter.TheoryFPR()` at runtime:
 
 ```go
 cfg := bloom.TargetConfig(10_000, 0.01)
 m, k, _ := cfg.Size()
+fmt.Println(bloom.TheoryFillFraction(10_000, m, k))       // ~0.47
 fmt.Println(bloom.TheoryFalsePositiveRate(10_000, m, k)) // ~0.01
 
 f, _ := bloom.NewFilter(cfg)
 for i := 0; i < 10_000; i++ {
 	f.Add([]byte(fmt.Sprintf("key:%d", i)))
 }
-fmt.Println(f.TheoryFPR()) // theoretical FPR at current insert count
+fmt.Println(f.TheoryFPR())  // theoretical FPR at current insert count
+fmt.Println(f.FillRatio())  // observed fill (may differ slightly from theory)
 ```
 
-Empirical validation lives in `TestFalsePositiveRate` (`bloom/bloom_test.go`).
+**Empirical FPR** is measured by inserting `n` distinct keys, then probing many absent keys and counting false positives: `rate = falsePositives / trials`. Tests in `bloom/fpr_empirical_test.go` assert empirical rates stay within generous bounds of theory; see also `TestFalsePositiveRate` in `bloom/bloom_test.go`.
 
 ## Demo apps
 
@@ -137,6 +185,10 @@ printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/
 
 # URL dedup with canonicalization (case, ports, trailing slashes, fragments)
 printf '%s\n' 'https://Example.com/' 'http://example.com:80' | go run ./cmd/urldedup -normalize
+
+# Sizing calculator — show m, k, fill fraction, and theory FPR for a target
+go run ./cmd/fprcalc -n 10000 -p 0.01
+go run ./cmd/fprcalc -n 5000 -p 0.001 -at 7500
 ```
 
 ## Tests & benchmarks
@@ -210,6 +262,8 @@ go test -bench=ReportMetrics ./benchcompare/
 | `WithHash(strategy)` / `WithSeed(seed)` | Set hash family and seed on any config |
 | `HashConfig` | Hash-only settings (`Strategy`, `Seed`); embedded in `Config.Hash` |
 | `TheoryFalsePositiveRate(n, m, k)` | Theoretical FPR after `n` inserts |
+| `TheoryFillFraction(n, m, k)` | Expected fraction of bits set after `n` inserts |
+| `PlanSizing(n, p, opts...)` | Resolve `(m, k)` and report achieved theory FPR at capacity |
 | `Config.TheoryFPRAt(n)` | FPR for a config at a given insert count |
 | `Filter.TheoryFPR()` / `CountingFilter.TheoryFPR()` | FPR at current insert count |
 | `Config.Validate()` / `Config.Size()` | Inspect or resolve sizing before construction |
