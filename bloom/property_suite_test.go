@@ -131,7 +131,7 @@ func TestBitIndexEquivalenceTable(t *testing.T) {
 }
 
 func TestFilterCountingParityProperty(t *testing.T) {
-	strategies := []Strategy{HashFNV, HashMurmur3}
+	strategies := AllStrategies()
 	for _, strategy := range strategies {
 		t.Run(strategy.String(), func(t *testing.T) {
 			prop := func(keyCount uint8, seed uint16) bool {

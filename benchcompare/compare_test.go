@@ -62,6 +62,71 @@ func TestCompareAddAllocatesLessThanHashSet(t *testing.T) {
 	}
 }
 
+func TestCompareHashSweep(t *testing.T) {
+	cfg := Config{ItemCount: 2_000, FalsePositiveRate: 0.01, LookupRepeats: 1}
+	strategies := []bloom.Strategy{bloom.HashFNV, bloom.HashMurmur3, bloom.HashXXHash}
+	results, err := CompareHashSweep(cfg, strategies)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != len(strategies) {
+		t.Fatalf("got %d sweep results, want %d", len(results), len(strategies))
+	}
+	for i, cmp := range results {
+		if cmp.Scenario != ScenarioAdd {
+			t.Fatalf("sweep[%d]: scenario = %q, want add", i, cmp.Scenario)
+		}
+		if cmp.Bloom.NsPerOp <= 0 {
+			t.Fatalf("sweep[%d]: bloom ns/op must be positive", i)
+		}
+	}
+}
+
+func TestCompareHashSweepInvalidStrategy(t *testing.T) {
+	cfg := Config{ItemCount: 100, FalsePositiveRate: 0.01}
+	_, err := CompareHashSweep(cfg, nil)
+	if err == nil {
+		t.Fatal("expected error for empty strategies")
+	}
+}
+
+func TestParseHashStrategies(t *testing.T) {
+	strategies, err := ParseHashStrategies("fnv, murmur3 ,xxhash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(strategies) != 3 {
+		t.Fatalf("got %d strategies, want 3", len(strategies))
+	}
+	if strategies[2] != bloom.HashXXHash {
+		t.Fatalf("strategies[2] = %v, want xxhash", strategies[2])
+	}
+	_, err = ParseHashStrategies("")
+	if err == nil {
+		t.Fatal("expected error for empty string")
+	}
+}
+
+func TestFormatHashSweep(t *testing.T) {
+	cfg := Config{ItemCount: 500, FalsePositiveRate: 0.01, LookupRepeats: 1}
+	strategies := []bloom.Strategy{bloom.HashFNV, bloom.HashXXHash}
+	results, err := CompareHashSweep(cfg, strategies)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := FormatHashSweep(cfg, strategies, results)
+	if !strings.Contains(text, "hash sweep") {
+		t.Fatal("sweep report missing title")
+	}
+	if !strings.Contains(text, "xxhash") {
+		t.Fatal("sweep report missing xxhash row")
+	}
+	md := FormatHashSweepMarkdown(cfg, strategies, results)
+	if !strings.Contains(md, "| Hash |") {
+		t.Fatal("sweep markdown missing header")
+	}
+}
+
 func TestCompareWithMurmur3Hash(t *testing.T) {
 	cfg := Config{
 		ItemCount:         500,

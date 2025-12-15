@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/dannysecurity/bloomlab/bloom"
 )
 
 func configHeader(cfg Config) string {
@@ -118,6 +120,59 @@ func FormatFPRSweepMarkdown(cfg Config, rates []float64, results []Comparison) s
 			cmp.Bloom.NsPerOp,
 			cmp.HashSet.NsPerOp,
 			cmp.SpeedRatio(),
+			cmp.Bloom.AllocsPerOp,
+			cmp.HashSet.AllocsPerOp,
+			cmp.AllocRatio(),
+		)
+	}
+	return b.String()
+}
+
+// FormatHashSweep renders add-scenario comparisons across hash strategies.
+func FormatHashSweep(cfg Config, strategies []bloom.Strategy, results []Comparison) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Bloom filter vs hash set — hash sweep (n=%d, p=%.4f, add workload)\n\n",
+		cfg.ItemCount, cfg.FalsePositiveRate)
+
+	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "HASH\tBLOOM ns/op\tHASHSET ns/op\tSPEEDUP\tBLOOM B/item\tHASHSET B/item\tSPACE\tBLOOM allocs/op\tHASHSET allocs/op\tALLOCS")
+	for i, cmp := range results {
+		fmt.Fprintf(tw, "%s\t%.0f\t%.0f\t%.2fx\t%.1f\t%.1f\t%.1fx\t%.2f\t%.2f\t%.1fx\n",
+			strategies[i].String(),
+			cmp.Bloom.NsPerOp,
+			cmp.HashSet.NsPerOp,
+			cmp.SpeedRatio(),
+			cmp.Bloom.BytesPerItem,
+			cmp.HashSet.BytesPerItem,
+			cmp.SpaceRatio(),
+			cmp.Bloom.AllocsPerOp,
+			cmp.HashSet.AllocsPerOp,
+			cmp.AllocRatio(),
+		)
+	}
+	_ = tw.Flush()
+
+	b.WriteString("\nHash strategy affects Bloom throughput only; sizing and hash set footprint are unchanged.\n")
+	return b.String()
+}
+
+// FormatHashSweepMarkdown renders the hash sweep as a markdown table.
+func FormatHashSweepMarkdown(cfg Config, strategies []bloom.Strategy, results []Comparison) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Bloom filter vs hash set — hash sweep\n\n")
+	fmt.Fprintf(&b, "Add workload at `n=%d`, `p=%.4f` across hash strategies.\n\n",
+		cfg.ItemCount, cfg.FalsePositiveRate)
+	fmt.Fprintln(&b, "| Hash | Bloom ns/op | Hash set ns/op | Speedup | Bloom B/item | Hash set B/item | Space ratio | Bloom allocs/op | Hash set allocs/op | Alloc ratio |")
+	fmt.Fprintln(&b, "|------|-------------|----------------|---------|--------------|-----------------|-------------|-----------------|--------------------|-------------|")
+	for i, cmp := range results {
+		fmt.Fprintf(&b, "| %s | %.0f | %.0f | %.2fx | %.1f | %.1f | %.1fx | %.2f | %.2f | %.1fx |\n",
+			strategies[i].String(),
+			cmp.Bloom.NsPerOp,
+			cmp.HashSet.NsPerOp,
+			cmp.SpeedRatio(),
+			cmp.Bloom.BytesPerItem,
+			cmp.HashSet.BytesPerItem,
+			cmp.SpaceRatio(),
 			cmp.Bloom.AllocsPerOp,
 			cmp.HashSet.AllocsPerOp,
 			cmp.AllocRatio(),

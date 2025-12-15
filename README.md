@@ -228,6 +228,10 @@ go run ./cmd/benchcompare -sweep-fpr -p-values 0.001,0.01,0.05,0.1 -markdown
 # Compare hash strategies (Bloom only; hash set ignores -hash/-seed)
 go run ./cmd/benchcompare -hash murmur3 -seed 42 -n 10000
 
+# Sweep hash families to compare Bloom add throughput at fixed sizing
+go run ./cmd/benchcompare -sweep-hash -n 50000
+go run ./cmd/benchcompare -sweep-hash -hash-values fnv,murmur3,xxhash -markdown
+
 # Markdown table for docs or CI artifacts
 go run ./cmd/benchcompare -markdown > docs/benchcompare.md
 ```
@@ -284,8 +288,9 @@ Bit positions use **double hashing**: `h(i) = (h1 + i·h2) mod m`. Hash settings
 
 | Strategy | Name | Notes |
 |----------|------|-------|
-| `HashFNV` | `fnv` | Default; FNV-1a 64-bit (backward compatible) |
+| `HashFNV` | `fnv` | Default; FNV-1a 64-bit (backward compatible; seed ignored) |
 | `HashMurmur3` | `murmur3` | MurmurHash3 64-bit with independent seeds for `h1`/`h2` |
+| `HashXXHash` | `xxhash` | xxHash 64-bit with independent seeds for `h1`/`h2` |
 
 ```go
 f, _ := bloom.NewFilter(bloom.TargetConfig(10_000, 0.01,
@@ -296,7 +301,7 @@ f, _ := bloom.NewFilter(bloom.TargetConfig(10_000, 0.01,
 
 When `m` is a power of two, indexing uses a bitmask fast path instead of modulo. Changing strategy or seed changes bit positions — filters are not interoperable across hash settings.
 
-Demo CLIs accept `-hash fnv|murmur3` and `-seed <uint64>`.
+Demo CLIs accept `-hash fnv|murmur3|xxhash` and `-seed <uint64>`.
 
 ## License
 

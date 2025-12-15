@@ -176,7 +176,7 @@ func TestFalsePositiveRatePerStrategy(t *testing.T) {
 	const n = 5000
 	const trials = 5000
 
-	for _, strategy := range []Strategy{HashFNV, HashMurmur3} {
+	for _, strategy := range AllStrategies() {
 		t.Run(strategy.String(), func(t *testing.T) {
 			cfg := TargetConfig(n, 0.01, WithHash(strategy))
 			f, err := newStandardEmpiricalFilter(cfg)

@@ -16,6 +16,8 @@ func TestParseStrategy(t *testing.T) {
 		{"FNV", HashFNV},
 		{"murmur3", HashMurmur3},
 		{"Murmur", HashMurmur3},
+		{"xxhash", HashXXHash},
+		{"xxh64", HashXXHash},
 	}
 	for _, tt := range tests {
 		got, err := ParseStrategy(tt.in)
@@ -33,10 +35,9 @@ func TestParseStrategy(t *testing.T) {
 }
 
 func TestHasherDeterministic(t *testing.T) {
-	strategies := []Strategy{HashFNV, HashMurmur3}
 	key := []byte("bloomlab-determinism-check")
 
-	for _, strategy := range strategies {
+	for _, strategy := range AllStrategies() {
 		t.Run(strategy.String(), func(t *testing.T) {
 			h := NewHasher(strategy, 42)
 			h1a, h2a := h.Derive(key)
@@ -53,10 +54,45 @@ func TestHasherDeterministic(t *testing.T) {
 
 func TestHasherSeedAffectsOutput(t *testing.T) {
 	key := []byte("seed-sensitivity")
-	a1, a2 := NewHasher(HashMurmur3, 0).Derive(key)
-	b1, b2 := NewHasher(HashMurmur3, 99).Derive(key)
-	if a1 == b1 && a2 == b2 {
-		t.Fatal("expected different hashes for different seeds")
+	for _, strategy := range []Strategy{HashMurmur3, HashXXHash} {
+		t.Run(strategy.String(), func(t *testing.T) {
+			a1, a2 := NewHasher(strategy, 0).Derive(key)
+			b1, b2 := NewHasher(strategy, 99).Derive(key)
+			if a1 == b1 && a2 == b2 {
+				t.Fatal("expected different hashes for different seeds")
+			}
+		})
+	}
+}
+
+func TestFNVSeedIgnored(t *testing.T) {
+	key := []byte("fnv-seed-invariance")
+	a1, a2 := NewHasher(HashFNV, 0).Derive(key)
+	b1, b2 := NewHasher(HashFNV, 99).Derive(key)
+	if a1 != b1 || a2 != b2 {
+		t.Fatalf("FNV with seed=0 (%d,%d) should match seed=99 (%d,%d)", a1, a2, b1, b2)
+	}
+}
+
+func TestXXHashGoldenVectors(t *testing.T) {
+	tests := []struct {
+		key  string
+		seed uint64
+		h1   uint64
+		h2   uint64
+	}{
+		{"", 0, 0xef46db3751d8e999, 0xc4349fc93c010000},
+		{"alpha", 0, 0xc758e1011dda5848, 0x7a08af8b42bd9cae},
+		{"alpha", 42, 0x41f206d893836e6b, 0xd7116ca205131a8},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			h1, h2 := NewHasher(HashXXHash, tt.seed).Derive([]byte(tt.key))
+			if h1 != tt.h1 || h2 != tt.h2 {
+				t.Fatalf("Derive(%q, %d) = (%#x, %#x), want (%#x, %#x)",
+					tt.key, tt.seed, h1, h2, tt.h1, tt.h2)
+			}
+		})
 	}
 }
 
@@ -192,6 +228,35 @@ func TestHashDistribution(t *testing.T) {
 		}
 		if empty > m/8 {
 			t.Fatalf("%d of %d buckets never hit; indexing may be degenerate", empty, m)
+		}
+	})
+
+	t.Run("xxhash", func(t *testing.T) {
+		buckets := make([]int, m)
+		h := NewHasher(HashXXHash, 0)
+
+		for i := 0; i < samples; i++ {
+			key := []byte(fmt.Sprintf("key-%d-%d", i, i*7919))
+			h1, h2 := h.Derive(key)
+			for j := uint(0); j < k; j++ {
+				buckets[bitIndex(h1, h2, m, j)]++
+			}
+		}
+
+		expected := float64(samples*k) / float64(m)
+		minCount, maxCount := buckets[0], buckets[0]
+		for _, count := range buckets[1:] {
+			if count < minCount {
+				minCount = count
+			}
+			if count > maxCount {
+				maxCount = count
+			}
+		}
+
+		if float64(minCount) < expected/4 || float64(maxCount) > expected*4 {
+			t.Fatalf("bucket spread [%d, %d] outside [%.0f, %.0f] for mean %.1f",
+				minCount, maxCount, expected/4, expected*4, expected)
 		}
 	})
 }

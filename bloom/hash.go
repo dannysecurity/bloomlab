@@ -13,7 +13,14 @@ const (
 	HashFNV Strategy = iota
 	// HashMurmur3 uses MurmurHash3 64-bit with independent seeds for h1 and h2.
 	HashMurmur3
+	// HashXXHash uses xxHash 64-bit with independent seeds for h1 and h2.
+	HashXXHash
 )
+
+// AllStrategies returns every built-in hash strategy in stable order.
+func AllStrategies() []Strategy {
+	return []Strategy{HashFNV, HashMurmur3, HashXXHash}
+}
 
 // String returns the CLI-friendly strategy name.
 func (s Strategy) String() string {
@@ -22,6 +29,8 @@ func (s Strategy) String() string {
 		return "fnv"
 	case HashMurmur3:
 		return "murmur3"
+	case HashXXHash:
+		return "xxhash"
 	default:
 		return fmt.Sprintf("strategy(%d)", int(s))
 	}
@@ -34,8 +43,10 @@ func ParseStrategy(name string) (Strategy, error) {
 		return HashFNV, nil
 	case "murmur3", "murmur":
 		return HashMurmur3, nil
+	case "xxhash", "xxh64", "xxh":
+		return HashXXHash, nil
 	default:
-		return 0, fmt.Errorf("bloom: unknown hash strategy %q (want fnv or murmur3)", name)
+		return 0, fmt.Errorf("bloom: unknown hash strategy %q (want fnv, murmur3, or xxhash)", name)
 	}
 }
 
@@ -52,6 +63,8 @@ func NewHasher(strategy Strategy, seed uint64) Hasher {
 	switch strategy {
 	case HashMurmur3:
 		return murmur3Hasher{seed: seed}
+	case HashXXHash:
+		return xxhashHasher{seed: seed}
 	default:
 		return fnvHasher{}
 	}
