@@ -172,6 +172,94 @@ func TestCompareFPRSweep(t *testing.T) {
 	}
 }
 
+func TestCompareSizeSweep(t *testing.T) {
+	cfg := Config{FalsePositiveRate: 0.01, LookupRepeats: 1}
+	counts := []uint64{500, 2_000, 5_000}
+	results, err := CompareSizeSweep(cfg, counts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != len(counts) {
+		t.Fatalf("got %d sweep results, want %d", len(results), len(counts))
+	}
+	firstBloomBytes := 0.0
+	for i, cmp := range results {
+		if cmp.Scenario != ScenarioAdd {
+			t.Fatalf("sweep[%d]: scenario = %q, want add", i, cmp.Scenario)
+		}
+		if cmp.Bloom.BytesPerItem <= 0 {
+			t.Fatalf("sweep[%d]: bloom bytes/item must be positive", i)
+		}
+		if cmp.HashSet.BytesPerItem <= 0 {
+			t.Fatalf("sweep[%d]: hash set bytes/item must be positive", i)
+		}
+		if cmp.SpaceRatio() <= 1 {
+			t.Fatalf("sweep[%d]: space ratio %.2f, want > 1 (bloom smaller than hash set)", i, cmp.SpaceRatio())
+		}
+		if i == 0 {
+			firstBloomBytes = cmp.Bloom.BytesPerItem
+			continue
+		}
+		delta := cmp.Bloom.BytesPerItem - firstBloomBytes
+		if delta < 0 {
+			delta = -delta
+		}
+		if delta/firstBloomBytes > 0.05 {
+			t.Fatalf("sweep[%d]: bloom bytes/item %.1f drifted from first %.1f at fixed p",
+				i, cmp.Bloom.BytesPerItem, firstBloomBytes)
+		}
+	}
+}
+
+func TestCompareSizeSweepInvalidCount(t *testing.T) {
+	cfg := Config{FalsePositiveRate: 0.01}
+	_, err := CompareSizeSweep(cfg, []uint64{0, 100})
+	if err == nil {
+		t.Fatal("expected error for zero item count")
+	}
+	_, err = CompareSizeSweep(cfg, nil)
+	if err == nil {
+		t.Fatal("expected error for empty counts")
+	}
+}
+
+func TestParseSizeCounts(t *testing.T) {
+	counts, err := ParseSizeCounts("1000, 5000 ,10000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(counts) != 3 {
+		t.Fatalf("got %d counts, want 3", len(counts))
+	}
+	if counts[1] != 5_000 {
+		t.Fatalf("counts[1] = %d, want 5000", counts[1])
+	}
+	_, err = ParseSizeCounts("")
+	if err == nil {
+		t.Fatal("expected error for empty string")
+	}
+}
+
+func TestFormatSizeSweep(t *testing.T) {
+	cfg := Config{FalsePositiveRate: 0.01, LookupRepeats: 1}
+	counts := []uint64{500, 2_000}
+	results, err := CompareSizeSweep(cfg, counts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := FormatSizeSweep(cfg, counts, results)
+	if !strings.Contains(text, "size sweep") {
+		t.Fatal("sweep report missing title")
+	}
+	if !strings.Contains(text, "2000") {
+		t.Fatal("sweep report missing second count")
+	}
+	md := FormatSizeSweepMarkdown(cfg, counts, results)
+	if !strings.Contains(md, "| Items n |") {
+		t.Fatal("sweep markdown missing header")
+	}
+}
+
 func TestCompareFPRSweepInvalidRate(t *testing.T) {
 	cfg := Config{ItemCount: 100}
 	_, err := CompareFPRSweep(cfg, []float64{0, 0.01})

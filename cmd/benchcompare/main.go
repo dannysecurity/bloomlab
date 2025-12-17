@@ -17,8 +17,10 @@ func main() {
 	seed := flag.Uint64("seed", 0, "Bloom hash seed")
 	sweepFPR := flag.Bool("sweep-fpr", false, "compare add workload across FPR targets instead of all scenarios")
 	sweepHash := flag.Bool("sweep-hash", false, "compare add workload across hash strategies instead of all scenarios")
+	sweepSize := flag.Bool("sweep-size", false, "compare add workload across item counts instead of all scenarios")
 	pValues := flag.String("p-values", "0.001,0.01,0.1", "comma-separated FPR targets for -sweep-fpr")
 	hashValues := flag.String("hash-values", "fnv,murmur3,xxhash", "comma-separated hash strategies for -sweep-hash")
+	sizeValues := flag.String("size-values", "10000,50000,100000,500000", "comma-separated item counts for -sweep-size")
 	markdown := flag.Bool("markdown", false, "emit markdown table instead of plain text")
 	flag.Parse()
 
@@ -73,6 +75,25 @@ func main() {
 			return
 		}
 		fmt.Print(benchcompare.FormatHashSweep(cfg, strategies, results))
+		return
+	}
+
+	if *sweepSize {
+		counts, err := benchcompare.ParseSizeCounts(*sizeValues)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "benchcompare: %v\n", err)
+			os.Exit(1)
+		}
+		results, err := benchcompare.CompareSizeSweep(cfg, counts)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "benchcompare: %v\n", err)
+			os.Exit(1)
+		}
+		if *markdown {
+			fmt.Print(benchcompare.FormatSizeSweepMarkdown(cfg, counts, results))
+			return
+		}
+		fmt.Print(benchcompare.FormatSizeSweep(cfg, counts, results))
 		return
 	}
 

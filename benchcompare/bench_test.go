@@ -69,6 +69,17 @@ func smallBenchConfig() Config {
 	}
 }
 
+func BenchmarkCompareSizeSweep(b *testing.B) {
+	cfg := smallBenchConfig()
+	counts := []uint64{1_000, 2_000, 5_000}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := CompareSizeSweep(cfg, counts); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 // ReportMetrics emits custom bench metrics so `go test -bench=ReportMetrics`
 // can compare bloom vs hash set side by side without parsing table output.
 func BenchmarkReportMetrics(b *testing.B) {

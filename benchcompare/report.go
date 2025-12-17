@@ -156,6 +156,58 @@ func FormatHashSweep(cfg Config, strategies []bloom.Strategy, results []Comparis
 	return b.String()
 }
 
+// FormatSizeSweep renders add-scenario comparisons across item counts.
+func FormatSizeSweep(cfg Config, counts []uint64, results []Comparison) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Bloom filter vs hash set — size sweep (p=%.4f, add workload)\n\n",
+		cfg.FalsePositiveRate)
+
+	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "ITEMS n\tBLOOM B/item\tHASHSET B/item\tSPACE\tBLOOM ns/op\tHASHSET ns/op\tSPEEDUP\tBLOOM allocs/op\tHASHSET allocs/op\tALLOCS")
+	for i, cmp := range results {
+		fmt.Fprintf(tw, "%d\t%.1f\t%.1f\t%.1fx\t%.0f\t%.0f\t%.2fx\t%.2f\t%.2f\t%.1fx\n",
+			counts[i],
+			cmp.Bloom.BytesPerItem,
+			cmp.HashSet.BytesPerItem,
+			cmp.SpaceRatio(),
+			cmp.Bloom.NsPerOp,
+			cmp.HashSet.NsPerOp,
+			cmp.SpeedRatio(),
+			cmp.Bloom.AllocsPerOp,
+			cmp.HashSet.AllocsPerOp,
+			cmp.AllocRatio(),
+		)
+	}
+	_ = tw.Flush()
+
+	b.WriteString("\nBloom bytes/item stays near the theoretical minimum for fixed p; hash set footprint grows with key storage.\n")
+	return b.String()
+}
+
+// FormatSizeSweepMarkdown renders the size sweep as a markdown table.
+func FormatSizeSweepMarkdown(cfg Config, counts []uint64, results []Comparison) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Bloom filter vs hash set — size sweep\n\n")
+	fmt.Fprintf(&b, "Add workload at `p=%.4f` across item counts.\n\n", cfg.FalsePositiveRate)
+	fmt.Fprintln(&b, "| Items n | Bloom B/item | Hash set B/item | Space ratio | Bloom ns/op | Hash set ns/op | Speedup | Bloom allocs/op | Hash set allocs/op | Alloc ratio |")
+	fmt.Fprintln(&b, "|---------|--------------|-----------------|-------------|-------------|----------------|---------|-----------------|--------------------|-------------|")
+	for i, cmp := range results {
+		fmt.Fprintf(&b, "| %d | %.1f | %.1f | %.1fx | %.0f | %.0f | %.2fx | %.2f | %.2f | %.1fx |\n",
+			counts[i],
+			cmp.Bloom.BytesPerItem,
+			cmp.HashSet.BytesPerItem,
+			cmp.SpaceRatio(),
+			cmp.Bloom.NsPerOp,
+			cmp.HashSet.NsPerOp,
+			cmp.SpeedRatio(),
+			cmp.Bloom.AllocsPerOp,
+			cmp.HashSet.AllocsPerOp,
+			cmp.AllocRatio(),
+		)
+	}
+	return b.String()
+}
+
 // FormatHashSweepMarkdown renders the hash sweep as a markdown table.
 func FormatHashSweepMarkdown(cfg Config, strategies []bloom.Strategy, results []Comparison) string {
 	var b strings.Builder

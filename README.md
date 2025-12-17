@@ -232,6 +232,10 @@ go run ./cmd/benchcompare -hash murmur3 -seed 42 -n 10000
 go run ./cmd/benchcompare -sweep-hash -n 50000
 go run ./cmd/benchcompare -sweep-hash -hash-values fnv,murmur3,xxhash -markdown
 
+# Sweep item counts to see how hash set footprint scales vs fixed Bloom sizing
+go run ./cmd/benchcompare -sweep-size
+go run ./cmd/benchcompare -sweep-size -size-values 10000,100000,1000000 -p 0.01 -markdown
+
 # Markdown table for docs or CI artifacts
 go run ./cmd/benchcompare -markdown > docs/benchcompare.md
 ```
