@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/dannysecurity/bloomlab/bloom"
+	"github.com/dannysecurity/bloomlab/cmd/internal/streamdedup"
 )
 
 type dedupOptions struct {
@@ -11,14 +12,9 @@ type dedupOptions struct {
 // classify reports whether line is a duplicate in f and inserts it when novel.
 // Empty lines are ignored and reported as not duplicate.
 func classify(f *bloom.Filter, line string, opts dedupOptions) (duplicate bool, ok bool) {
-	key, ok := canonicalKey(line, opts.normalize)
-	if !ok {
-		return false, false
+	keyFn := func(line string) (string, bool) {
+		return canonicalKey(line, opts.normalize)
 	}
-	keyBytes := []byte(key)
-	if f.Contains(keyBytes) {
-		return true, true
-	}
-	f.Add(keyBytes)
-	return false, true
+	d := streamdedup.New(f, keyFn)
+	return d.Classify(line)
 }

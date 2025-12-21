@@ -8,7 +8,7 @@ A Go toolkit for [Bloom filters](https://en.wikipedia.org/wiki/Bloom_filter): sp
 - **Counting Bloom filter** (`bloom.CountingFilter`) — supports deletion via per-bit counters
 - **Benchmarks** — add, lookup, and remove throughput
 - **benchcompare** — programmatic Bloom filter vs `map[string]struct{}` comparison with CLI and Go benchmarks
-- **Demo CLIs** — `bloomdemo`, `countingdemo`, `urldedup`, `fprcalc`, and `benchcompare` for interactive exploration
+- **Demo CLIs** — `bloomdemo`, `countingdemo`, `streamdedup`, `urldedup`, `fprcalc`, and `benchcompare` for interactive exploration
 
 ## Install
 
@@ -179,12 +179,18 @@ go run ./cmd/countingdemo alpha beta
 go run ./cmd/countingdemo -hash murmur3 -seed 42 alpha beta
 go run ./cmd/countingdemo -remove alpha
 
-# Stream deduper — classify stdin lines as new or duplicate (URLs, logs, etc.)
+# Generic stream deduper — classify any stdin lines as new or duplicate
+printf '%s\n' 'alpha' 'beta' 'alpha' | go run ./cmd/streamdedup
+printf '%s\n' 'Alpha' 'alpha' | go run ./cmd/streamdedup -ignore-case
+printf '%s\n' 'log-a' 'log-b' 'log-a' | go run ./cmd/streamdedup -json
+
+# URL stream deduper — same check-then-insert flow with optional URL canonicalization
 printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/urldedup
 printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/urldedup -quiet
 
 # URL dedup with canonicalization (case, ports, trailing slashes, fragments)
 printf '%s\n' 'https://Example.com/' 'http://example.com:80' | go run ./cmd/urldedup -normalize
+printf '%s\n' 'https://a.test' 'https://a.test' | go run ./cmd/urldedup -json
 
 # Sizing calculator — show m, k, fill fraction, and theory FPR for a target
 go run ./cmd/fprcalc -n 10000 -p 0.01

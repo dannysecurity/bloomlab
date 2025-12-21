@@ -13,30 +13,30 @@ import (
 func main() {
 	flags := filterflags.Register(100_000)
 	quiet := flag.Bool("quiet", false, "print summary only")
-	normalize := flag.Bool("normalize", false, "canonicalize URLs (scheme/host case, default ports, trailing slashes, fragments)")
+	ignoreCase := flag.Bool("ignore-case", false, "compare lines case-insensitively")
 	jsonOut := flag.Bool("json", false, "emit one JSON object per line on stdout")
 	flag.Parse()
 
 	cfg, err := flags.Config()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "urldedup: %v\n", err)
+		fmt.Fprintf(os.Stderr, "streamdedup: %v\n", err)
 		os.Exit(1)
 	}
 	f, err := bloom.NewFilter(cfg)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "urldedup: %v\n", err)
+		fmt.Fprintf(os.Stderr, "streamdedup: %v\n", err)
 		os.Exit(1)
 	}
 
 	if flag.NArg() > 0 {
-		fmt.Fprintln(os.Stderr, "urldedup: reads lines from stdin; flags configure the Bloom filter")
-		fmt.Fprintln(os.Stderr, "Usage: urldedup [flags] < urls.txt")
+		fmt.Fprintln(os.Stderr, "streamdedup: reads lines from stdin; flags configure the Bloom filter")
+		fmt.Fprintln(os.Stderr, "Usage: streamdedup [flags] < lines.txt")
 		os.Exit(2)
 	}
 
-	opts := dedupOptions{normalize: *normalize}
-	keyFn := func(line string) (string, bool) {
-		return canonicalKey(line, opts.normalize)
+	keyFn := streamdedup.TrimKey
+	if *ignoreCase {
+		keyFn = streamdedup.IgnoreCaseKey
 	}
 
 	format := streamdedup.FormatText
@@ -49,7 +49,7 @@ func main() {
 		Quiet:  *quiet,
 		Format: format,
 	}); err != nil {
-		fmt.Fprintf(os.Stderr, "urldedup: %v\n", err)
+		fmt.Fprintf(os.Stderr, "streamdedup: %v\n", err)
 		os.Exit(1)
 	}
 }
