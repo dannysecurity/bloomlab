@@ -52,7 +52,12 @@ func (cf *CountingFilter) Add(key []byte) error {
 	return nil
 }
 
-// Remove decrements counters for key. Returns false if key was not present.
+// Remove decrements counters for key. Returns false if key was not present
+// (all k probed counters are zero).
+//
+// Only call Remove for keys previously inserted with Add. If Contains returns
+// true for a key that was never added (a false positive), Remove will still
+// decrement counters and can introduce false negatives for other keys.
 func (cf *CountingFilter) Remove(key []byte) bool {
 	if !cf.Contains(key) {
 		return false
@@ -106,6 +111,19 @@ func (cf *CountingFilter) Clear() {
 		cf.counters[i] = 0
 	}
 	cf.n = 0
+}
+
+// MaxCounter returns the largest counter value in the filter. Values near 255
+// indicate that further Adds of keys hashing to the same positions may return
+// ErrCounterOverflow.
+func (cf *CountingFilter) MaxCounter() uint8 {
+	var max uint8
+	for _, c := range cf.counters {
+		if c > max {
+			max = c
+		}
+	}
+	return max
 }
 
 // FillRatio returns the fraction of counters that are non-zero.

@@ -106,6 +106,31 @@ func TestCountingFilterClear(t *testing.T) {
 	}
 }
 
+func TestCountingFilterMaxCounter(t *testing.T) {
+	cf, err := NewCounting(64, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cf.MaxCounter(); got != 0 {
+		t.Fatalf("empty filter MaxCounter() = %d, want 0", got)
+	}
+
+	key := []byte("dup")
+	for range 3 {
+		if err := cf.Add(key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := cf.MaxCounter(); got != 3 {
+		t.Fatalf("after three adds MaxCounter() = %d, want 3", got)
+	}
+
+	cf.Clear()
+	if got := cf.MaxCounter(); got != 0 {
+		t.Fatalf("after clear MaxCounter() = %d, want 0", got)
+	}
+}
+
 func TestCountingFilterFillRatio(t *testing.T) {
 	cf, err := NewCounting(64, 2)
 	if err != nil {
