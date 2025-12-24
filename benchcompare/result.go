@@ -16,6 +16,8 @@ type Comparison struct {
 	Scenario Scenario
 	Bloom    BackendResult
 	HashSet  BackendResult
+	// LookupHitRatio records the hit fraction for ScenarioContainsMixed; zero otherwise.
+	LookupHitRatio float64
 }
 
 // SpeedRatio returns hash-set ns/op divided by bloom ns/op. Values above 1 mean

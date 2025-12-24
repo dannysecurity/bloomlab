@@ -39,6 +39,8 @@ func compareScenario(cfg Config, sc Scenario) (Comparison, error) {
 		return compareContainsHit(cfg)
 	case ScenarioContainsMiss:
 		return compareContainsMiss(cfg)
+	case ScenarioContainsMixed:
+		return compareContainsMixed(cfg)
 	case ScenarioMixedStream:
 		return compareMixedStream(cfg)
 	case ScenarioRemove:
@@ -241,6 +243,79 @@ func compareContainsMiss(cfg Config) (Comparison, error) {
 	}, nil
 }
 
+func compareContainsMixed(cfg Config) (Comparison, error) {
+	hitRatio := cfg.LookupHitRatio
+	if hitRatio < 0 || hitRatio > 1 {
+		return Comparison{}, fmt.Errorf("benchcompare: LookupHitRatio must be in [0, 1]")
+	}
+
+	seedKeys := makeKeys(cfg.ItemCount)
+	f, err := bloom.NewFilter(cfg.targetBloomConfig())
+	if err != nil {
+		return Comparison{}, err
+	}
+	set := make(map[string]struct{}, int(cfg.ItemCount))
+	for _, key := range seedKeys {
+		f.Add(key)
+		set[string(key)] = struct{}{}
+	}
+
+	lookupKeys := makeMixedLookupKeys(cfg.ItemCount, hitRatio)
+	repeats := cfg.LookupRepeats
+	totalOps := len(lookupKeys) * repeats
+
+	bloomStart := time.Now()
+	for r := 0; r < repeats; r++ {
+		for _, key := range lookupKeys {
+			_ = f.Contains(key)
+		}
+	}
+	bloomElapsed := time.Since(bloomStart)
+
+	hashStart := time.Now()
+	for r := 0; r < repeats; r++ {
+		for _, key := range lookupKeys {
+			_, _ = set[string(key)]
+		}
+	}
+	hashElapsed := time.Since(hashStart)
+
+	bloomBytes := float64((f.BitCount() + 7) / 8)
+	hashBytes := mapHeapBytes(set)
+
+	bloomAllocs := allocsPerOp(totalOps, func() {
+		for r := 0; r < repeats; r++ {
+			for _, key := range lookupKeys {
+				_ = f.Contains(key)
+			}
+		}
+	})
+	hashAllocs := allocsPerOp(totalOps, func() {
+		for r := 0; r < repeats; r++ {
+			for _, key := range lookupKeys {
+				_, _ = set[string(key)]
+			}
+		}
+	})
+
+	total := float64(totalOps)
+	return Comparison{
+		Scenario:       ScenarioContainsMixed,
+		LookupHitRatio: hitRatio,
+		Bloom: BackendResult{
+			NsPerOp:      float64(bloomElapsed.Nanoseconds()) / total,
+			BytesPerItem: bloomBytes / float64(len(seedKeys)),
+			AllocsPerOp:  bloomAllocs,
+			TheoryFPR:    f.TheoryFPR(),
+		},
+		HashSet: BackendResult{
+			NsPerOp:      float64(hashElapsed.Nanoseconds()) / total,
+			BytesPerItem: hashBytes / float64(len(seedKeys)),
+			AllocsPerOp:  hashAllocs,
+		},
+	}, nil
+}
+
 func compareMixedStream(cfg Config) (Comparison, error) {
 	// First half unique, second half repeats — typical dedup stream shape.
 	stream := makeMixedStream(cfg.ItemCount)
@@ -420,6 +495,35 @@ func makeMixedStream(n uint64) [][]byte {
 		stream[i] = []byte(fmt.Sprintf("stream-%d", i%half))
 	}
 	return stream
+}
+
+// makeMixedLookupKeys builds n lookup keys with hitRatio fraction present in the
+// seeded set and the remainder absent. Keys are interleaved so neither backend
+// sees long runs of hits or misses.
+func makeMixedLookupKeys(n uint64, hitRatio float64) [][]byte {
+	hitCount := int(float64(n) * hitRatio)
+	if hitCount > int(n) {
+		hitCount = int(n)
+	}
+	missCount := int(n) - hitCount
+	keys := make([][]byte, int(n))
+	hitIdx, missIdx := 0, 0
+	for i := 0; i < int(n); i++ {
+		targetHits := (i + 1) * hitCount / int(n)
+		if hitIdx < targetHits {
+			keys[i] = []byte(fmt.Sprintf("key-%d", hitIdx))
+			hitIdx++
+			continue
+		}
+		offset := int(n) + 1_000_000 + missIdx
+		keys[i] = []byte(fmt.Sprintf("miss-%d", offset))
+		missIdx++
+	}
+	if missIdx != missCount || hitIdx != hitCount {
+		panic(fmt.Sprintf("benchcompare: mixed lookup key counts hit=%d miss=%d want hit=%d miss=%d",
+			hitIdx, missIdx, hitCount, missCount))
+	}
+	return keys
 }
 
 func mapHeapBytes(set map[string]struct{}) float64 {

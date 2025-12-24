@@ -13,6 +13,9 @@ const (
 	ScenarioContainsHit Scenario = "contains_hit"
 	// ScenarioContainsMiss measures lookup throughput for keys known to be absent.
 	ScenarioContainsMiss Scenario = "contains_miss"
+	// ScenarioContainsMixed measures lookup throughput with a configurable mix of
+	// present and absent keys (see Config.LookupHitRatio).
+	ScenarioContainsMixed Scenario = "contains_mixed"
 	// ScenarioMixedStream simulates stream dedup: check each key, insert on first sight.
 	ScenarioMixedStream Scenario = "mixed_stream"
 	// ScenarioRemove measures delete throughput using a counting Bloom filter vs map delete.
@@ -24,6 +27,7 @@ var AllScenarios = []Scenario{
 	ScenarioAdd,
 	ScenarioContainsHit,
 	ScenarioContainsMiss,
+	ScenarioContainsMixed,
 	ScenarioMixedStream,
 	ScenarioRemove,
 }
@@ -36,6 +40,9 @@ type Config struct {
 	FalsePositiveRate float64
 	// LookupRepeats is how many times each lookup key is queried per scenario.
 	LookupRepeats int
+	// LookupHitRatio is the fraction of lookup keys that are present in
+	// ScenarioContainsMixed (0 = all misses, 1 = all hits).
+	LookupHitRatio float64
 	// Hash selects the Bloom filter hash family and seed (ignored by hash sets).
 	Hash bloom.HashConfig
 }
@@ -50,5 +57,6 @@ func DefaultConfig() Config {
 		ItemCount:         100_000,
 		FalsePositiveRate: 0.01,
 		LookupRepeats:     4,
+		LookupHitRatio:    0.5,
 	}
 }

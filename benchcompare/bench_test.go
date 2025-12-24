@@ -32,6 +32,16 @@ func BenchmarkCompareContainsMiss(b *testing.B) {
 	}
 }
 
+func BenchmarkCompareContainsMixed(b *testing.B) {
+	cfg := smallBenchConfig()
+	cfg.LookupHitRatio = 0.5
+	for i := 0; i < b.N; i++ {
+		if _, err := compareContainsMixed(cfg); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkCompareMixedStream(b *testing.B) {
 	cfg := smallBenchConfig()
 	for i := 0; i < b.N; i++ {
@@ -75,6 +85,17 @@ func BenchmarkCompareSizeSweep(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if _, err := CompareSizeSweep(cfg, counts); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkCompareLookupMixSweep(b *testing.B) {
+	cfg := smallBenchConfig()
+	ratios := []float64{0, 0.5, 1.0}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := CompareLookupMixSweep(cfg, ratios); err != nil {
 			b.Fatal(err)
 		}
 	}

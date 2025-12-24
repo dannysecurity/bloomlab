@@ -233,13 +233,72 @@ func FormatHashSweepMarkdown(cfg Config, strategies []bloom.Strategy, results []
 	return b.String()
 }
 
+// FormatLookupMixSweep renders contains-mixed comparisons across hit ratios.
+func FormatLookupMixSweep(cfg Config, ratios []float64, results []Comparison) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Bloom filter vs hash set — lookup mix sweep (n=%d, p=%.4f, lookup-repeats=%d)\n\n",
+		cfg.ItemCount, cfg.FalsePositiveRate, cfg.LookupRepeats)
+
+	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "HIT RATIO\tBLOOM ns/op\tHASHSET ns/op\tSPEEDUP\tBLOOM B/item\tHASHSET B/item\tSPACE\tBLOOM allocs/op\tHASHSET allocs/op\tALLOCS")
+	for i, cmp := range results {
+		fmt.Fprintf(tw, "%.0f%%\t%.0f\t%.0f\t%.2fx\t%.1f\t%.1f\t%.1fx\t%.2f\t%.2f\t%.1fx\n",
+			ratios[i]*100,
+			cmp.Bloom.NsPerOp,
+			cmp.HashSet.NsPerOp,
+			cmp.SpeedRatio(),
+			cmp.Bloom.BytesPerItem,
+			cmp.HashSet.BytesPerItem,
+			cmp.SpaceRatio(),
+			cmp.Bloom.AllocsPerOp,
+			cmp.HashSet.AllocsPerOp,
+			cmp.AllocRatio(),
+		)
+	}
+	_ = tw.Flush()
+
+	b.WriteString("\nHit ratio is the fraction of lookup keys present in the set. Bloom miss probes touch more unset bits; hash set miss probes exit after the first map slot.\n")
+	return b.String()
+}
+
+// FormatLookupMixSweepMarkdown renders the lookup mix sweep as a markdown table.
+func FormatLookupMixSweepMarkdown(cfg Config, ratios []float64, results []Comparison) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Bloom filter vs hash set — lookup mix sweep\n\n")
+	fmt.Fprintf(&b, "Contains-mixed workload at `n=%d`, `p=%.4f`, lookup repeats `%d` across hit ratios.\n\n",
+		cfg.ItemCount, cfg.FalsePositiveRate, cfg.LookupRepeats)
+	fmt.Fprintln(&b, "| Hit ratio | Bloom ns/op | Hash set ns/op | Speedup | Bloom B/item | Hash set B/item | Space ratio | Bloom allocs/op | Hash set allocs/op | Alloc ratio |")
+	fmt.Fprintln(&b, "|-----------|-------------|----------------|---------|--------------|-----------------|-------------|-----------------|--------------------|-------------|")
+	for i, cmp := range results {
+		fmt.Fprintf(&b, "| %.0f%% | %.0f | %.0f | %.2fx | %.1f | %.1f | %.1fx | %.2f | %.2f | %.1fx |\n",
+			ratios[i]*100,
+			cmp.Bloom.NsPerOp,
+			cmp.HashSet.NsPerOp,
+			cmp.SpeedRatio(),
+			cmp.Bloom.BytesPerItem,
+			cmp.HashSet.BytesPerItem,
+			cmp.SpaceRatio(),
+			cmp.Bloom.AllocsPerOp,
+			cmp.HashSet.AllocsPerOp,
+			cmp.AllocRatio(),
+		)
+	}
+	return b.String()
+}
+
 func formatNotes(cmp Comparison) string {
 	notes := ""
-	if cmp.Bloom.TheoryFPR > 0 && cmp.Scenario != ScenarioMixedStream {
+	if cmp.Bloom.TheoryFPR > 0 && cmp.Scenario != ScenarioMixedStream && cmp.Scenario != ScenarioContainsMixed {
 		notes = fmt.Sprintf("theory FPR %.3f%%", cmp.Bloom.TheoryFPR*100)
 	}
 	if cmp.Scenario == ScenarioMixedStream {
 		notes = fmt.Sprintf("dup calls bloom=%d hashset=%d", cmp.Bloom.FalsePositives, cmp.HashSet.FalsePositives)
+	}
+	if cmp.Scenario == ScenarioContainsMixed {
+		notes = fmt.Sprintf("hit ratio %.0f%%", cmp.LookupHitRatio*100)
+		if cmp.Bloom.TheoryFPR > 0 {
+			notes += fmt.Sprintf("; theory FPR %.3f%%", cmp.Bloom.TheoryFPR*100)
+		}
 	}
 	if cmp.Scenario == ScenarioRemove {
 		if notes != "" {

@@ -211,6 +211,121 @@ func TestCompareSizeSweep(t *testing.T) {
 	}
 }
 
+func TestCompareContainsMixedHitRatio(t *testing.T) {
+	cfg := Config{
+		ItemCount:         200,
+		FalsePositiveRate: 0.01,
+		LookupRepeats:     1,
+		LookupHitRatio:    0.5,
+	}
+	results, err := Compare(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mixed Comparison
+	for _, cmp := range results {
+		if cmp.Scenario == ScenarioContainsMixed {
+			mixed = cmp
+			break
+		}
+	}
+	if mixed.LookupHitRatio != 0.5 {
+		t.Fatalf("LookupHitRatio = %v, want 0.5", mixed.LookupHitRatio)
+	}
+	if mixed.Bloom.NsPerOp <= 0 || mixed.HashSet.NsPerOp <= 0 {
+		t.Fatal("contains_mixed: ns/op must be positive")
+	}
+}
+
+func TestCompareLookupMixSweep(t *testing.T) {
+	cfg := Config{ItemCount: 2_000, FalsePositiveRate: 0.01, LookupRepeats: 1}
+	ratios := []float64{0, 0.5, 1.0}
+	results, err := CompareLookupMixSweep(cfg, ratios)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != len(ratios) {
+		t.Fatalf("got %d sweep results, want %d", len(results), len(ratios))
+	}
+	for i, cmp := range results {
+		if cmp.Scenario != ScenarioContainsMixed {
+			t.Fatalf("sweep[%d]: scenario = %q, want contains_mixed", i, cmp.Scenario)
+		}
+		if cmp.LookupHitRatio != ratios[i] {
+			t.Fatalf("sweep[%d]: LookupHitRatio = %v, want %v", i, cmp.LookupHitRatio, ratios[i])
+		}
+	}
+}
+
+func TestCompareLookupMixSweepInvalidRatio(t *testing.T) {
+	cfg := Config{ItemCount: 100, FalsePositiveRate: 0.01}
+	_, err := CompareLookupMixSweep(cfg, []float64{-0.1, 0.5})
+	if err == nil {
+		t.Fatal("expected error for negative ratio")
+	}
+	_, err = CompareLookupMixSweep(cfg, nil)
+	if err == nil {
+		t.Fatal("expected error for empty ratios")
+	}
+}
+
+func TestParseLookupMixRatios(t *testing.T) {
+	ratios, err := ParseLookupMixRatios("0, 0.5 ,1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ratios) != 3 {
+		t.Fatalf("got %d ratios, want 3", len(ratios))
+	}
+	if ratios[1] != 0.5 {
+		t.Fatalf("ratios[1] = %v, want 0.5", ratios[1])
+	}
+	_, err = ParseLookupMixRatios("")
+	if err == nil {
+		t.Fatal("expected error for empty string")
+	}
+}
+
+func TestFormatLookupMixSweep(t *testing.T) {
+	cfg := Config{ItemCount: 500, FalsePositiveRate: 0.01, LookupRepeats: 1}
+	ratios := []float64{0, 1.0}
+	results, err := CompareLookupMixSweep(cfg, ratios)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := FormatLookupMixSweep(cfg, ratios, results)
+	if !strings.Contains(text, "lookup mix sweep") {
+		t.Fatal("sweep report missing title")
+	}
+	if !strings.Contains(text, "100%") {
+		t.Fatal("sweep report missing 100% hit ratio row")
+	}
+	md := FormatLookupMixSweepMarkdown(cfg, ratios, results)
+	if !strings.Contains(md, "| Hit ratio |") {
+		t.Fatal("sweep markdown missing header")
+	}
+}
+
+func TestMakeMixedLookupKeys(t *testing.T) {
+	keys := makeMixedLookupKeys(100, 0.5)
+	if len(keys) != 100 {
+		t.Fatalf("got %d keys, want 100", len(keys))
+	}
+	hits, misses := 0, 0
+	for _, key := range keys {
+		if strings.HasPrefix(string(key), "key-") {
+			hits++
+		} else if strings.HasPrefix(string(key), "miss-") {
+			misses++
+		} else {
+			t.Fatalf("unexpected key %q", key)
+		}
+	}
+	if hits != 50 || misses != 50 {
+		t.Fatalf("hits=%d misses=%d, want 50 each", hits, misses)
+	}
+}
+
 func TestCompareSizeSweepInvalidCount(t *testing.T) {
 	cfg := Config{FalsePositiveRate: 0.01}
 	_, err := CompareSizeSweep(cfg, []uint64{0, 100})
@@ -433,5 +548,8 @@ func TestDefaultConfig(t *testing.T) {
 	}
 	if cfg.FalsePositiveRate != 0.01 {
 		t.Fatalf("FalsePositiveRate = %v, want 0.01", cfg.FalsePositiveRate)
+	}
+	if cfg.LookupHitRatio != 0.5 {
+		t.Fatalf("LookupHitRatio = %v, want 0.5", cfg.LookupHitRatio)
 	}
 }
