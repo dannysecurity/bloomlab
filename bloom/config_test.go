@@ -194,6 +194,11 @@ func TestConfigOptions(t *testing.T) {
 	if hashCfg.Hash.Strategy != HashMurmur3 || hashCfg.Hash.Seed != 9 {
 		t.Fatalf("WithHashConfig = %+v", hashCfg.Hash)
 	}
+
+	wide := ExplicitConfig(64, 2, WithCounterWidth(16))
+	if wide.CounterWidth != 16 {
+		t.Fatalf("CounterWidth = %d, want 16", wide.CounterWidth)
+	}
 }
 
 func TestHashConfigString(t *testing.T) {

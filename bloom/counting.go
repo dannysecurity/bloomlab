@@ -5,27 +5,40 @@ import "errors"
 var ErrCounterOverflow = errors.New("bloom: counter overflow")
 
 // CountingFilter supports deletion by tracking per-bit counters instead of bits.
-// Counters are uint8; overflow returns ErrCounterOverflow.
+// Counters default to uint8; use Config.WithCounterWidth(16) for a wider variant
+// that tolerates more duplicate inserts before ErrCounterOverflow.
 type CountingFilter struct {
-	counters []uint8
-	m        uint64
-	k        uint
-	n        uint64 // approximate insert count (Add calls, not deduplicated)
-	hasher   Hasher
+	counters8  []uint8
+	counters16 []uint16
+	width      uint8
+	m          uint64
+	k          uint
+	n          uint64 // approximate insert count (Add calls, not deduplicated)
+	hasher     Hasher
 }
 
 // NewCountingFilter constructs a CountingFilter from cfg.
 func NewCountingFilter(cfg Config) (*CountingFilter, error) {
+	if err := cfg.validateCounterWidth(); err != nil {
+		return nil, err
+	}
 	m, k, err := cfg.Size()
 	if err != nil {
 		return nil, err
 	}
-	return &CountingFilter{
-		counters: make([]uint8, m),
-		m:        m,
-		k:        k,
-		hasher:   cfg.Hasher(),
-	}, nil
+	width := cfg.resolvedCounterWidth()
+	cf := &CountingFilter{
+		m:      m,
+		k:      k,
+		width:  width,
+		hasher: cfg.Hasher(),
+	}
+	if width == 16 {
+		cf.counters16 = make([]uint16, m)
+	} else {
+		cf.counters8 = make([]uint8, m)
+	}
+	return cf, nil
 }
 
 // NewCounting creates a counting Bloom filter with m bits and k hash functions.
@@ -38,15 +51,17 @@ func NewCountingFromTarget(expectedCapacity uint64, falsePositiveRate float64) (
 	return NewCountingFilter(TargetConfig(expectedCapacity, falsePositiveRate))
 }
 
+// CounterWidth returns the per-bit counter width in bytes (8 or 16).
+func (cf *CountingFilter) CounterWidth() uint8 { return cf.width }
+
 // Add increments counters for key.
 func (cf *CountingFilter) Add(key []byte) error {
 	h1, h2 := cf.hasher.Derive(key)
 	for i := uint(0); i < cf.k; i++ {
 		idx := bitIndex(h1, h2, cf.m, i)
-		if cf.counters[idx] == 255 {
-			return ErrCounterOverflow
+		if err := cf.incCounter(idx); err != nil {
+			return err
 		}
-		cf.counters[idx]++
 	}
 	cf.n++
 	return nil
@@ -65,9 +80,7 @@ func (cf *CountingFilter) Remove(key []byte) bool {
 	h1, h2 := cf.hasher.Derive(key)
 	for i := uint(0); i < cf.k; i++ {
 		idx := bitIndex(h1, h2, cf.m, i)
-		if cf.counters[idx] > 0 {
-			cf.counters[idx]--
-		}
+		cf.decCounter(idx)
 	}
 	if cf.n > 0 {
 		cf.n--
@@ -80,7 +93,7 @@ func (cf *CountingFilter) Contains(key []byte) bool {
 	h1, h2 := cf.hasher.Derive(key)
 	for i := uint(0); i < cf.k; i++ {
 		idx := bitIndex(h1, h2, cf.m, i)
-		if cf.counters[idx] == 0 {
+		if cf.counterAt(idx) == 0 {
 			return false
 		}
 	}
@@ -97,7 +110,12 @@ func (cf *CountingFilter) TheoryFPR() float64 {
 }
 
 // CounterBytes returns the number of bytes backing the per-bit counters.
-func (cf *CountingFilter) CounterBytes() uint64 { return uint64(len(cf.counters)) }
+func (cf *CountingFilter) CounterBytes() uint64 {
+	if cf.width == 16 {
+		return uint64(len(cf.counters16)) * 2
+	}
+	return uint64(len(cf.counters8))
+}
 
 // BitCount returns m.
 func (cf *CountingFilter) BitCount() uint64 { return cf.m }
@@ -107,20 +125,34 @@ func (cf *CountingFilter) HashCount() uint { return cf.k }
 
 // Clear resets all counters and insert tracking. m, k, and the hasher are unchanged.
 func (cf *CountingFilter) Clear() {
-	for i := range cf.counters {
-		cf.counters[i] = 0
+	if cf.width == 16 {
+		for i := range cf.counters16 {
+			cf.counters16[i] = 0
+		}
+	} else {
+		for i := range cf.counters8 {
+			cf.counters8[i] = 0
+		}
 	}
 	cf.n = 0
 }
 
-// MaxCounter returns the largest counter value in the filter. Values near 255
-// indicate that further Adds of keys hashing to the same positions may return
-// ErrCounterOverflow.
-func (cf *CountingFilter) MaxCounter() uint8 {
-	var max uint8
-	for _, c := range cf.counters {
-		if c > max {
-			max = c
+// MaxCounter returns the largest counter value in the filter. Values near the
+// width limit indicate that further Adds of keys hashing to the same positions
+// may return ErrCounterOverflow.
+func (cf *CountingFilter) MaxCounter() uint64 {
+	var max uint64
+	if cf.width == 16 {
+		for _, c := range cf.counters16 {
+			if v := uint64(c); v > max {
+				max = v
+			}
+		}
+		return max
+	}
+	for _, c := range cf.counters8 {
+		if v := uint64(c); v > max {
+			max = v
 		}
 	}
 	return max
@@ -129,10 +161,52 @@ func (cf *CountingFilter) MaxCounter() uint8 {
 // FillRatio returns the fraction of counters that are non-zero.
 func (cf *CountingFilter) FillRatio() float64 {
 	var occupied uint64
-	for _, c := range cf.counters {
-		if c > 0 {
-			occupied++
+	if cf.width == 16 {
+		for _, c := range cf.counters16 {
+			if c > 0 {
+				occupied++
+			}
+		}
+	} else {
+		for _, c := range cf.counters8 {
+			if c > 0 {
+				occupied++
+			}
 		}
 	}
 	return float64(occupied) / float64(cf.m)
+}
+
+func (cf *CountingFilter) counterAt(idx uint64) uint64 {
+	if cf.width == 16 {
+		return uint64(cf.counters16[idx])
+	}
+	return uint64(cf.counters8[idx])
+}
+
+func (cf *CountingFilter) incCounter(idx uint64) error {
+	if cf.width == 16 {
+		if cf.counters16[idx] == 65535 {
+			return ErrCounterOverflow
+		}
+		cf.counters16[idx]++
+		return nil
+	}
+	if cf.counters8[idx] == 255 {
+		return ErrCounterOverflow
+	}
+	cf.counters8[idx]++
+	return nil
+}
+
+func (cf *CountingFilter) decCounter(idx uint64) {
+	if cf.width == 16 {
+		if cf.counters16[idx] > 0 {
+			cf.counters16[idx]--
+		}
+		return
+	}
+	if cf.counters8[idx] > 0 {
+		cf.counters8[idx]--
+	}
 }

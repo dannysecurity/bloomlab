@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	ErrInvalidCapacity = errors.New("bloom: capacity must be positive")
-	ErrInvalidFPR      = errors.New("bloom: false positive rate must be in (0, 1)")
-	ErrInvalidBits     = errors.New("bloom: bit count must be positive")
+	ErrInvalidCapacity    = errors.New("bloom: capacity must be positive")
+	ErrInvalidFPR         = errors.New("bloom: false positive rate must be in (0, 1)")
+	ErrInvalidBits        = errors.New("bloom: bit count must be positive")
+	ErrInvalidCounterWidth = errors.New("bloom: counter width must be 8 or 16")
 )
 
 const (
@@ -78,6 +79,15 @@ func WithMaxHashCount(maxK uint) ConfigOption {
 	}
 }
 
+// WithCounterWidth selects per-bit counter width for counting filters.
+// Supported values are 8 (default) and 16. Wider counters use more memory
+// but tolerate more duplicate inserts before ErrCounterOverflow.
+func WithCounterWidth(width uint8) ConfigOption {
+	return func(c *Config) {
+		c.CounterWidth = width
+	}
+}
+
 // Config describes how a Bloom filter is sized. Use TargetConfig for the
 // standard capacity/FPR formulas, or ExplicitConfig for fixed m and k.
 // Hash settings live in Config.Hash and can be supplied via WithHash, WithSeed,
@@ -93,6 +103,9 @@ type Config struct {
 	// MinBits and MaxHashCount bound derived sizing. Zero values use package defaults.
 	MinBits      uint64
 	MaxHashCount uint
+
+	// CounterWidth selects uint8 (0 or 8) or uint16 (16) counters for counting filters.
+	CounterWidth uint8
 
 	Hash HashConfig
 }
@@ -177,6 +190,22 @@ func (c Config) String() string {
 func applyOptions(cfg *Config, opts []ConfigOption) {
 	for _, opt := range opts {
 		opt(cfg)
+	}
+}
+
+func (c Config) resolvedCounterWidth() uint8 {
+	if c.CounterWidth == 0 || c.CounterWidth == 8 {
+		return 8
+	}
+	return c.CounterWidth
+}
+
+func (c Config) validateCounterWidth() error {
+	switch c.resolvedCounterWidth() {
+	case 8, 16:
+		return nil
+	default:
+		return ErrInvalidCounterWidth
 	}
 }
 
