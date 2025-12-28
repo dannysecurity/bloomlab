@@ -25,6 +25,8 @@ func TestNormalizeURL(t *testing.T) {
 		{"example.com/page", "https://example.com/page"},
 		{"not a url at all", "not a url at all"},
 		{"https://a.test/", "https://a.test/"},
+		{"//Example.com/path/", "https://example.com/path"},
+		{"//HOST:443/a", "https://host/a"},
 	}
 
 	for _, tc := range tests {
@@ -43,12 +45,12 @@ func TestClassifyWithNormalize(t *testing.T) {
 
 	opts := dedupOptions{normalize: true}
 
-	dup, ok := classify(f, "HTTP://Example.com:80/path/", opts)
+	dup, ok := classify(f, "HTTPS://Example.com:443/path/", opts)
 	if !ok || dup {
 		t.Fatalf("first canonical visit: ok=%v dup=%v", ok, dup)
 	}
 
-	dup, ok = classify(f, "http://example.com/path", opts)
+	dup, ok = classify(f, "https://example.com/path", opts)
 	if !ok || !dup {
 		t.Fatalf("equivalent url should be duplicate: ok=%v dup=%v", ok, dup)
 	}
@@ -56,5 +58,10 @@ func TestClassifyWithNormalize(t *testing.T) {
 	dup, ok = classify(f, "https://other.test", opts)
 	if !ok || dup {
 		t.Fatalf("different host: ok=%v dup=%v", ok, dup)
+	}
+
+	dup, ok = classify(f, "//example.com/path", opts)
+	if !ok || !dup {
+		t.Fatalf("protocol-relative url should match https equivalent: ok=%v dup=%v", ok, dup)
 	}
 }

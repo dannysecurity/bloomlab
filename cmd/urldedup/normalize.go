@@ -7,7 +7,9 @@ import (
 
 // canonicalKey returns the dedup key for a stdin line.
 // Blank lines yield ok=false. When normalize is false the trimmed line is used as-is.
-// When normalize is true, parseable URLs are canonicalized; other lines keep their trimmed form.
+// When normalize is true, parseable URLs are canonicalized (scheme/host case,
+// default ports, trailing slashes, fragments, and protocol-relative //host paths
+// defaulting to https); other lines keep their trimmed form.
 func canonicalKey(line string, normalize bool) (key string, ok bool) {
 	line = strings.TrimSpace(line)
 	if line == "" {
@@ -36,6 +38,9 @@ func normalizeURL(raw string) string {
 	}
 
 	u.Scheme = strings.ToLower(u.Scheme)
+	if u.Scheme == "" {
+		u.Scheme = "https"
+	}
 	u.Host = strings.ToLower(u.Host)
 	u.Fragment = ""
 
