@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	flags := filterflags.Register(10_000)
+	flags := filterflags.RegisterCounting(10_000)
 	remove := flag.Bool("remove", false, "remove words instead of adding")
 	flag.Parse()
 
