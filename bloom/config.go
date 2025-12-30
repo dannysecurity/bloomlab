@@ -88,10 +88,13 @@ func WithCounterWidth(width uint8) ConfigOption {
 	}
 }
 
-// Config describes how a Bloom filter is sized. Use TargetConfig for the
-// standard capacity/FPR formulas, or ExplicitConfig for fixed m and k.
-// Hash settings live in Config.Hash and can be supplied via WithHash, WithSeed,
-// or WithHashConfig. Sizing bounds use WithMinBits and WithMaxHashCount.
+// Config describes how a Bloom filter is sized in one of two modes:
+//   - Target mode: ExpectedCapacity and FalsePositiveRate derive m and k.
+//   - Explicit mode: non-zero Bits (m) and HashCount (k) are used directly.
+//
+// Use TargetConfig or ExplicitConfig to construct a config in the intended mode.
+// Hash settings live in Config.Hash (WithHash, WithSeed, WithHashConfig).
+// Sizing bounds for target mode use WithMinBits and WithMaxHashCount.
 type Config struct {
 	ExpectedCapacity  uint64
 	FalsePositiveRate float64
@@ -132,12 +135,22 @@ func ExplicitConfig(bits uint64, hashCount uint, opts ...ConfigOption) Config {
 	return cfg
 }
 
+// isExplicitSizing reports whether m and k come from Bits and HashCount.
+func (c Config) isExplicitSizing() bool {
+	return c.Bits != 0
+}
+
+// isIncompleteExplicitSizing reports ExplicitConfig(0, k): hash count without positive m.
+func (c Config) isIncompleteExplicitSizing() bool {
+	return c.HashCount > 0 && c.ExpectedCapacity == 0 && c.FalsePositiveRate == 0
+}
+
 // Validate checks that the configuration is usable.
 func (c Config) Validate() error {
-	if c.Bits != 0 {
+	if c.isExplicitSizing() {
 		return nil
 	}
-	if c.HashCount > 0 && c.ExpectedCapacity == 0 && c.FalsePositiveRate == 0 {
+	if c.isIncompleteExplicitSizing() {
 		return ErrInvalidBits
 	}
 	if c.ExpectedCapacity == 0 {
@@ -155,7 +168,7 @@ func (c Config) Size() (m uint64, k uint, err error) {
 		return 0, 0, err
 	}
 
-	if c.Bits != 0 {
+	if c.isExplicitSizing() {
 		k = c.HashCount
 		if k == 0 {
 			k = 1
@@ -181,7 +194,7 @@ func (c Config) String() string {
 		return fmt.Sprintf("invalid config: %v", err)
 	}
 	hash := c.Hash.String()
-	if c.Bits != 0 {
+	if c.isExplicitSizing() {
 		return fmt.Sprintf("explicit m=%d k=%d hash=%s", m, k, hash)
 	}
 	return fmt.Sprintf("target n=%d p=%g -> m=%d k=%d hash=%s", c.ExpectedCapacity, c.FalsePositiveRate, m, k, hash)
