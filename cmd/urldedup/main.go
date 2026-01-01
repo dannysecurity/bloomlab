@@ -8,12 +8,16 @@ import (
 	"github.com/dannysecurity/bloomlab/bloom"
 	"github.com/dannysecurity/bloomlab/cmd/internal/filterflags"
 	"github.com/dannysecurity/bloomlab/cmd/internal/streamdedup"
+	"github.com/dannysecurity/bloomlab/cmd/internal/urldedup"
 )
 
 func main() {
 	flags := filterflags.Register(100_000)
 	quiet := flag.Bool("quiet", false, "print summary only")
 	normalize := flag.Bool("normalize", false, "canonicalize URLs (scheme/host case, default ports, trailing slashes, fragments)")
+	stripQuery := flag.Bool("strip-query", false, "ignore query strings when deduplicating")
+	stripTracking := flag.Bool("strip-tracking", false, "drop common marketing/click-tracking query parameters (utm_*, fbclid, gclid, etc.)")
+	domainOnly := flag.Bool("domain-only", false, "deduplicate by host name only, ignoring path and query")
 	jsonOut := flag.Bool("json", false, "emit one JSON object per line on stdout")
 	flag.Parse()
 
@@ -34,9 +38,14 @@ func main() {
 		os.Exit(2)
 	}
 
-	opts := dedupOptions{normalize: *normalize}
+	opts := urldedup.Options{
+		Normalize:     *normalize,
+		StripQuery:    *stripQuery,
+		StripTracking: *stripTracking,
+		DomainOnly:    *domainOnly,
+	}
 	keyFn := func(line string) (string, bool) {
-		return canonicalKey(line, opts.normalize)
+		return urldedup.Key(line, opts)
 	}
 
 	format := streamdedup.FormatText

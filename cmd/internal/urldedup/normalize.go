@@ -1,49 +1,35 @@
-package main
+package urldedup
 
 import (
 	"net/url"
 	"strings"
 )
 
-// canonicalKey returns the dedup key for a stdin line.
-// Blank lines yield ok=false. When normalize is false the trimmed line is used as-is.
-// When normalize is true, parseable URLs are canonicalized (scheme/host case,
-// default ports, trailing slashes, fragments, and protocol-relative //host paths
-// defaulting to https); other lines keep their trimmed form.
-func canonicalKey(line string, normalize bool) (key string, ok bool) {
-	line = strings.TrimSpace(line)
-	if line == "" {
-		return "", false
-	}
-	if !normalize {
-		return line, true
-	}
-	return normalizeURL(line), true
-}
-
-func normalizeURL(raw string) string {
+func parseURL(raw string) (*url.URL, bool) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return raw
+		return nil, false
 	}
 	if u.Scheme == "" && u.Host == "" && !strings.Contains(raw, "://") {
 		if withScheme, err := url.Parse("https://" + raw); err == nil && withScheme.Host != "" {
 			u = withScheme
 		} else {
-			return raw
+			return nil, false
 		}
 	}
 	if u.Host == "" {
-		return raw
+		return nil, false
 	}
+	return u, true
+}
 
+func canonicalize(u *url.URL) {
 	u.Scheme = strings.ToLower(u.Scheme)
 	if u.Scheme == "" {
 		u.Scheme = "https"
 	}
 	u.Host = strings.ToLower(u.Host)
 	u.Fragment = ""
-
 	u.Host = stripDefaultPort(u.Scheme, u.Host)
 
 	if u.Path == "" {
@@ -51,8 +37,6 @@ func normalizeURL(raw string) string {
 	} else if u.Path != "/" {
 		u.Path = strings.TrimSuffix(u.Path, "/")
 	}
-
-	return u.String()
 }
 
 func stripDefaultPort(scheme, host string) string {
@@ -65,6 +49,15 @@ func stripDefaultPort(scheme, host string) string {
 		if strings.HasSuffix(host, ":443") {
 			return host[:len(host)-4]
 		}
+	}
+	return host
+}
+
+func hostKey(u *url.URL, normalize bool) string {
+	host := u.Host
+	if normalize {
+		host = strings.ToLower(host)
+		host = stripDefaultPort(u.Scheme, host)
 	}
 	return host
 }
