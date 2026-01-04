@@ -24,7 +24,7 @@ func CompareHashSweep(cfg Config, strategies []bloom.Strategy) ([]Comparison, er
 	out := make([]Comparison, 0, len(strategies))
 	for _, strategy := range strategies {
 		sweepCfg := cfg
-		sweepCfg.Hash.Strategy = strategy
+		sweepCfg.Bloom = sweepCfg.Bloom.WithHashStrategy(strategy)
 		cmp, err := compareAdd(sweepCfg)
 		if err != nil {
 			return nil, err

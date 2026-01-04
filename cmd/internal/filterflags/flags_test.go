@@ -7,6 +7,22 @@ import (
 	"github.com/dannysecurity/bloomlab/bloom"
 )
 
+func TestFlagsConfigWithBounds(t *testing.T) {
+	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+	f := Register(1000)
+	if err := flag.CommandLine.Parse([]string{"-min-bits", "256", "-max-k", "8"}); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := f.Config()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.MinBits != 256 || cfg.MaxHashCount != 8 {
+		t.Fatalf("bounds = minBits=%d maxK=%d, want 256 and 8", cfg.MinBits, cfg.MaxHashCount)
+	}
+}
+
 func TestFlagsConfig(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 	f := Register(1000)

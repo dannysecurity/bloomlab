@@ -8,9 +8,7 @@ import (
 )
 
 func TestCompareAllScenarios(t *testing.T) {
-	cfg := Config{
-		ItemCount:         2_000,
-		FalsePositiveRate: 0.01,
+	cfg := Config{Bloom: bloom.TargetConfig(2_000, 0.01),
 		LookupRepeats:     2,
 	}
 	results, err := Compare(cfg)
@@ -37,9 +35,7 @@ func TestCompareAllScenarios(t *testing.T) {
 }
 
 func TestCompareAddAllocatesLessThanHashSet(t *testing.T) {
-	cfg := Config{
-		ItemCount:         1_000,
-		FalsePositiveRate: 0.01,
+	cfg := Config{Bloom: bloom.TargetConfig(1_000, 0.01),
 		LookupRepeats:     1,
 	}
 	results, err := Compare(cfg)
@@ -63,7 +59,7 @@ func TestCompareAddAllocatesLessThanHashSet(t *testing.T) {
 }
 
 func TestCompareHashSweep(t *testing.T) {
-	cfg := Config{ItemCount: 2_000, FalsePositiveRate: 0.01, LookupRepeats: 1}
+	cfg := Config{Bloom: bloom.TargetConfig(2_000, 0.01), LookupRepeats: 1}
 	strategies := []bloom.Strategy{bloom.HashFNV, bloom.HashMurmur3, bloom.HashXXHash}
 	results, err := CompareHashSweep(cfg, strategies)
 	if err != nil {
@@ -83,7 +79,7 @@ func TestCompareHashSweep(t *testing.T) {
 }
 
 func TestCompareHashSweepInvalidStrategy(t *testing.T) {
-	cfg := Config{ItemCount: 100, FalsePositiveRate: 0.01}
+	cfg := Config{Bloom: bloom.TargetConfig(100, 0.01)}
 	_, err := CompareHashSweep(cfg, nil)
 	if err == nil {
 		t.Fatal("expected error for empty strategies")
@@ -108,7 +104,7 @@ func TestParseHashStrategies(t *testing.T) {
 }
 
 func TestFormatHashSweep(t *testing.T) {
-	cfg := Config{ItemCount: 500, FalsePositiveRate: 0.01, LookupRepeats: 1}
+	cfg := Config{Bloom: bloom.TargetConfig(500, 0.01), LookupRepeats: 1}
 	strategies := []bloom.Strategy{bloom.HashFNV, bloom.HashXXHash}
 	results, err := CompareHashSweep(cfg, strategies)
 	if err != nil {
@@ -129,13 +125,11 @@ func TestFormatHashSweep(t *testing.T) {
 
 func TestCompareWithMurmur3Hash(t *testing.T) {
 	cfg := Config{
-		ItemCount:         500,
-		FalsePositiveRate: 0.01,
-		LookupRepeats:     1,
-		Hash: bloom.HashConfig{
-			Strategy: bloom.HashMurmur3,
-			Seed:     7,
-		},
+		Bloom: bloom.TargetConfig(500, 0.01,
+			bloom.WithHash(bloom.HashMurmur3),
+			bloom.WithSeed(7),
+		),
+		LookupRepeats: 1,
 	}
 	results, err := Compare(cfg)
 	if err != nil {
@@ -147,7 +141,7 @@ func TestCompareWithMurmur3Hash(t *testing.T) {
 }
 
 func TestCompareFPRSweep(t *testing.T) {
-	cfg := Config{ItemCount: 2_000, LookupRepeats: 1}
+	cfg := Config{Bloom: bloom.TargetConfig(2_000, 0.01), LookupRepeats: 1}
 	rates := []float64{0.01, 0.05, 0.1}
 	results, err := CompareFPRSweep(cfg, rates)
 	if err != nil {
@@ -173,7 +167,7 @@ func TestCompareFPRSweep(t *testing.T) {
 }
 
 func TestCompareSizeSweep(t *testing.T) {
-	cfg := Config{FalsePositiveRate: 0.01, LookupRepeats: 1}
+	cfg := Config{Bloom: bloom.TargetConfig(100_000, 0.01), LookupRepeats: 1}
 	counts := []uint64{500, 2_000, 5_000}
 	results, err := CompareSizeSweep(cfg, counts)
 	if err != nil {
@@ -212,9 +206,7 @@ func TestCompareSizeSweep(t *testing.T) {
 }
 
 func TestCompareContainsMixedHitRatio(t *testing.T) {
-	cfg := Config{
-		ItemCount:         200,
-		FalsePositiveRate: 0.01,
+	cfg := Config{Bloom: bloom.TargetConfig(200, 0.01),
 		LookupRepeats:     1,
 		LookupHitRatio:    0.5,
 	}
@@ -238,7 +230,7 @@ func TestCompareContainsMixedHitRatio(t *testing.T) {
 }
 
 func TestCompareLookupMixSweep(t *testing.T) {
-	cfg := Config{ItemCount: 2_000, FalsePositiveRate: 0.01, LookupRepeats: 1}
+	cfg := Config{Bloom: bloom.TargetConfig(2_000, 0.01), LookupRepeats: 1}
 	ratios := []float64{0, 0.5, 1.0}
 	results, err := CompareLookupMixSweep(cfg, ratios)
 	if err != nil {
@@ -258,7 +250,7 @@ func TestCompareLookupMixSweep(t *testing.T) {
 }
 
 func TestCompareLookupMixSweepInvalidRatio(t *testing.T) {
-	cfg := Config{ItemCount: 100, FalsePositiveRate: 0.01}
+	cfg := Config{Bloom: bloom.TargetConfig(100, 0.01)}
 	_, err := CompareLookupMixSweep(cfg, []float64{-0.1, 0.5})
 	if err == nil {
 		t.Fatal("expected error for negative ratio")
@@ -287,7 +279,7 @@ func TestParseLookupMixRatios(t *testing.T) {
 }
 
 func TestFormatLookupMixSweep(t *testing.T) {
-	cfg := Config{ItemCount: 500, FalsePositiveRate: 0.01, LookupRepeats: 1}
+	cfg := Config{Bloom: bloom.TargetConfig(500, 0.01), LookupRepeats: 1}
 	ratios := []float64{0, 1.0}
 	results, err := CompareLookupMixSweep(cfg, ratios)
 	if err != nil {
@@ -327,7 +319,7 @@ func TestMakeMixedLookupKeys(t *testing.T) {
 }
 
 func TestCompareSizeSweepInvalidCount(t *testing.T) {
-	cfg := Config{FalsePositiveRate: 0.01}
+	cfg := Config{Bloom: bloom.TargetConfig(100_000, 0.01)}
 	_, err := CompareSizeSweep(cfg, []uint64{0, 100})
 	if err == nil {
 		t.Fatal("expected error for zero item count")
@@ -356,7 +348,7 @@ func TestParseSizeCounts(t *testing.T) {
 }
 
 func TestFormatSizeSweep(t *testing.T) {
-	cfg := Config{FalsePositiveRate: 0.01, LookupRepeats: 1}
+	cfg := Config{Bloom: bloom.TargetConfig(100_000, 0.01), LookupRepeats: 1}
 	counts := []uint64{500, 2_000}
 	results, err := CompareSizeSweep(cfg, counts)
 	if err != nil {
@@ -376,7 +368,7 @@ func TestFormatSizeSweep(t *testing.T) {
 }
 
 func TestCompareFPRSweepInvalidRate(t *testing.T) {
-	cfg := Config{ItemCount: 100}
+	cfg := Config{Bloom: bloom.TargetConfig(100, 0.01)}
 	_, err := CompareFPRSweep(cfg, []float64{0, 0.01})
 	if err == nil {
 		t.Fatal("expected error for zero FPR rate")
@@ -405,7 +397,7 @@ func TestParseFPRRates(t *testing.T) {
 }
 
 func TestFormatFPRSweep(t *testing.T) {
-	cfg := Config{ItemCount: 500, LookupRepeats: 1}
+	cfg := Config{Bloom: bloom.TargetConfig(500, 0.01), LookupRepeats: 1}
 	rates := []float64{0.01, 0.1}
 	results, err := CompareFPRSweep(cfg, rates)
 	if err != nil {
@@ -425,9 +417,7 @@ func TestFormatFPRSweep(t *testing.T) {
 }
 
 func TestCompareRemoveUsesCountingFilter(t *testing.T) {
-	cfg := Config{
-		ItemCount:         500,
-		FalsePositiveRate: 0.01,
+	cfg := Config{Bloom: bloom.TargetConfig(500, 0.01),
 		LookupRepeats:     1,
 	}
 	results, err := Compare(cfg)
@@ -453,9 +443,7 @@ func TestCompareRemoveUsesCountingFilter(t *testing.T) {
 }
 
 func TestCompareMixedStreamDetectsDuplicates(t *testing.T) {
-	cfg := Config{
-		ItemCount:         100,
-		FalsePositiveRate: 0.01,
+	cfg := Config{Bloom: bloom.TargetConfig(100, 0.01),
 		LookupRepeats:     1,
 	}
 	results, err := Compare(cfg)
@@ -479,11 +467,11 @@ func TestCompareMixedStreamDetectsDuplicates(t *testing.T) {
 }
 
 func TestCompareInvalidConfig(t *testing.T) {
-	_, err := Compare(Config{ItemCount: 0, FalsePositiveRate: 0.01})
+	_, err := Compare(Config{Bloom: bloom.TargetConfig(0, 0.01)})
 	if err == nil {
-		t.Fatal("expected error for zero ItemCount")
+		t.Fatal("expected error for zero capacity")
 	}
-	_, err = Compare(Config{ItemCount: 100, FalsePositiveRate: 0})
+	_, err = Compare(Config{Bloom: bloom.TargetConfig(100, 0)})
 	if err == nil {
 		t.Fatal("expected error for invalid FPR")
 	}
@@ -507,7 +495,7 @@ func TestSpeedAndSpaceRatios(t *testing.T) {
 }
 
 func TestFormatReportContainsScenarios(t *testing.T) {
-	cfg := Config{ItemCount: 500, FalsePositiveRate: 0.01, LookupRepeats: 1}
+	cfg := Config{Bloom: bloom.TargetConfig(500, 0.01), LookupRepeats: 1}
 	results, err := Compare(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -527,7 +515,7 @@ func TestFormatReportContainsScenarios(t *testing.T) {
 }
 
 func TestFormatMarkdownTable(t *testing.T) {
-	cfg := Config{ItemCount: 500, FalsePositiveRate: 0.01, LookupRepeats: 1}
+	cfg := Config{Bloom: bloom.TargetConfig(500, 0.01), LookupRepeats: 1}
 	results, err := Compare(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -543,11 +531,11 @@ func TestFormatMarkdownTable(t *testing.T) {
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	if cfg.ItemCount != 100_000 {
-		t.Fatalf("ItemCount = %d, want 100000", cfg.ItemCount)
+	if cfg.Bloom.ExpectedCapacity != 100_000 {
+		t.Fatalf("ExpectedCapacity = %d, want 100000", cfg.Bloom.ExpectedCapacity)
 	}
-	if cfg.FalsePositiveRate != 0.01 {
-		t.Fatalf("FalsePositiveRate = %v, want 0.01", cfg.FalsePositiveRate)
+	if cfg.Bloom.FalsePositiveRate != 0.01 {
+		t.Fatalf("FalsePositiveRate = %v, want 0.01", cfg.Bloom.FalsePositiveRate)
 	}
 	if cfg.LookupHitRatio != 0.5 {
 		t.Fatalf("LookupHitRatio = %v, want 0.5", cfg.LookupHitRatio)

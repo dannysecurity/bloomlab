@@ -32,31 +32,25 @@ var AllScenarios = []Scenario{
 	ScenarioRemove,
 }
 
-// Config controls sizing and iteration count for a comparison run.
+// Config controls Bloom filter sizing and benchmark runtime options.
+// Bloom holds the canonical bloom.Config; LookupRepeats and LookupHitRatio are
+// benchcompare-only settings.
 type Config struct {
-	// ItemCount is the number of distinct keys inserted (or probed for lookups).
-	ItemCount uint64
-	// FalsePositiveRate sizes the Bloom filter via bloom.TargetConfig.
-	FalsePositiveRate float64
-	// LookupRepeats is how many times each lookup key is queried per scenario.
-	LookupRepeats int
-	// LookupHitRatio is the fraction of lookup keys that are present in
-	// ScenarioContainsMixed (0 = all misses, 1 = all hits).
+	Bloom          bloom.Config
+	LookupRepeats  int
 	LookupHitRatio float64
-	// Hash selects the Bloom filter hash family and seed (ignored by hash sets).
-	Hash bloom.HashConfig
 }
 
-func (cfg Config) targetBloomConfig() bloom.Config {
-	return bloom.TargetConfig(cfg.ItemCount, cfg.FalsePositiveRate, bloom.WithHashConfig(cfg.Hash))
+// NewConfig wraps a validated bloom.Config with benchcompare defaults.
+func NewConfig(bloomCfg bloom.Config) Config {
+	return Config{
+		Bloom:          bloomCfg,
+		LookupRepeats:  1,
+		LookupHitRatio: 0.5,
+	}
 }
 
 // DefaultConfig returns settings aligned with bloom/bloom_bench_test.go.
 func DefaultConfig() Config {
-	return Config{
-		ItemCount:         100_000,
-		FalsePositiveRate: 0.01,
-		LookupRepeats:     4,
-		LookupHitRatio:    0.5,
-	}
+	return NewConfig(bloom.TargetConfig(100_000, 0.01))
 }

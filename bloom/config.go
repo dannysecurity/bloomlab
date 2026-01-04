@@ -145,6 +145,24 @@ func (c Config) isIncompleteExplicitSizing() bool {
 	return c.HashCount > 0 && c.ExpectedCapacity == 0 && c.FalsePositiveRate == 0
 }
 
+// WithExpectedCapacity returns a copy with an updated target capacity.
+func (c Config) WithExpectedCapacity(n uint64) Config {
+	c.ExpectedCapacity = n
+	return c
+}
+
+// WithFalsePositiveRate returns a copy with an updated target false positive rate.
+func (c Config) WithFalsePositiveRate(p float64) Config {
+	c.FalsePositiveRate = p
+	return c
+}
+
+// WithHashStrategy returns a copy using the given hash strategy.
+func (c Config) WithHashStrategy(strategy Strategy) Config {
+	c.Hash.Strategy = strategy
+	return c
+}
+
 // Validate checks that the configuration is usable.
 func (c Config) Validate() error {
 	if c.isExplicitSizing() {

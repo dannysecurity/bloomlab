@@ -3,6 +3,8 @@ package benchcompare
 import (
 	"fmt"
 	"testing"
+
+	"github.com/dannysecurity/bloomlab/bloom"
 )
 
 func BenchmarkCompareAdd(b *testing.B) {
@@ -72,9 +74,7 @@ func BenchmarkCompareAllDefault(b *testing.B) {
 }
 
 func smallBenchConfig() Config {
-	return Config{
-		ItemCount:         5_000,
-		FalsePositiveRate: 0.01,
+	return Config{Bloom: bloom.TargetConfig(5_000, 0.01),
 		LookupRepeats:     2,
 	}
 }

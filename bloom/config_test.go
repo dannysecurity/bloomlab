@@ -210,6 +210,24 @@ func TestHashConfigString(t *testing.T) {
 	}
 }
 
+func TestConfigWithBounds(t *testing.T) {
+	cfg := TargetConfig(100_000, 0.001, WithMinBits(256), WithMaxHashCount(8))
+	updated := cfg.WithFalsePositiveRate(0.05)
+	if updated.FalsePositiveRate != 0.05 || cfg.FalsePositiveRate != 0.001 {
+		t.Fatalf("WithFalsePositiveRate mutated original: orig=%g updated=%g", cfg.FalsePositiveRate, updated.FalsePositiveRate)
+	}
+
+	resized := cfg.WithExpectedCapacity(50_000)
+	if resized.ExpectedCapacity != 50_000 || cfg.ExpectedCapacity != 100_000 {
+		t.Fatalf("WithExpectedCapacity mutated original: orig=%d updated=%d", cfg.ExpectedCapacity, resized.ExpectedCapacity)
+	}
+
+	hashed := cfg.WithHashStrategy(HashXXHash)
+	if hashed.Hash.Strategy != HashXXHash || cfg.Hash.Strategy != HashFNV {
+		t.Fatalf("WithHashStrategy mutated original: orig=%v updated=%v", cfg.Hash.Strategy, hashed.Hash.Strategy)
+	}
+}
+
 func TestConfigMatchesLegacyConstructors(t *testing.T) {
 	legacy, err := New(5000, 0.01)
 	if err != nil {

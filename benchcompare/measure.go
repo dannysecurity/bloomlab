@@ -10,11 +10,8 @@ import (
 
 // Compare runs every scenario in AllScenarios and returns paired results.
 func Compare(cfg Config) ([]Comparison, error) {
-	if cfg.ItemCount == 0 {
-		return nil, fmt.Errorf("benchcompare: ItemCount must be > 0")
-	}
-	if cfg.FalsePositiveRate <= 0 || cfg.FalsePositiveRate >= 1 {
-		return nil, fmt.Errorf("benchcompare: FalsePositiveRate must be in (0, 1)")
+	if err := cfg.Bloom.Validate(); err != nil {
+		return nil, fmt.Errorf("benchcompare: %w", err)
 	}
 	if cfg.LookupRepeats <= 0 {
 		cfg.LookupRepeats = 1
@@ -51,10 +48,10 @@ func compareScenario(cfg Config, sc Scenario) (Comparison, error) {
 }
 
 func compareAdd(cfg Config) (Comparison, error) {
-	keys := makeKeys(cfg.ItemCount)
+	keys := makeKeys(cfg.Bloom.ExpectedCapacity)
 
 	bloomStart := time.Now()
-	f, err := bloom.NewFilter(cfg.targetBloomConfig())
+	f, err := bloom.NewFilter(cfg.Bloom)
 	if err != nil {
 		return Comparison{}, err
 	}
@@ -68,7 +65,7 @@ func compareAdd(cfg Config) (Comparison, error) {
 	var before, after runtime.MemStats
 	runtime.GC()
 	runtime.ReadMemStats(&before)
-	set := make(map[string]struct{}, int(cfg.ItemCount))
+	set := make(map[string]struct{}, int(cfg.Bloom.ExpectedCapacity))
 	for _, key := range keys {
 		set[string(key)] = struct{}{}
 	}
@@ -78,7 +75,7 @@ func compareAdd(cfg Config) (Comparison, error) {
 
 	n := len(keys)
 	bloomAllocs := allocsPerOp(n, func() {
-		ff, err := bloom.NewFilter(cfg.targetBloomConfig())
+		ff, err := bloom.NewFilter(cfg.Bloom)
 		if err != nil {
 			panic(err)
 		}
@@ -87,7 +84,7 @@ func compareAdd(cfg Config) (Comparison, error) {
 		}
 	})
 	hashAllocs := allocsPerOp(n, func() {
-		s := make(map[string]struct{}, int(cfg.ItemCount))
+		s := make(map[string]struct{}, int(cfg.Bloom.ExpectedCapacity))
 		for _, key := range keys {
 			s[string(key)] = struct{}{}
 		}
@@ -111,12 +108,12 @@ func compareAdd(cfg Config) (Comparison, error) {
 }
 
 func compareContainsHit(cfg Config) (Comparison, error) {
-	keys := makeKeys(cfg.ItemCount)
-	f, err := bloom.NewFilter(cfg.targetBloomConfig())
+	keys := makeKeys(cfg.Bloom.ExpectedCapacity)
+	f, err := bloom.NewFilter(cfg.Bloom)
 	if err != nil {
 		return Comparison{}, err
 	}
-	set := make(map[string]struct{}, int(cfg.ItemCount))
+	set := make(map[string]struct{}, int(cfg.Bloom.ExpectedCapacity))
 	for _, key := range keys {
 		f.Add(key)
 		set[string(key)] = struct{}{}
@@ -177,18 +174,18 @@ func compareContainsHit(cfg Config) (Comparison, error) {
 }
 
 func compareContainsMiss(cfg Config) (Comparison, error) {
-	seedKeys := makeKeys(cfg.ItemCount)
-	f, err := bloom.NewFilter(cfg.targetBloomConfig())
+	seedKeys := makeKeys(cfg.Bloom.ExpectedCapacity)
+	f, err := bloom.NewFilter(cfg.Bloom)
 	if err != nil {
 		return Comparison{}, err
 	}
-	set := make(map[string]struct{}, int(cfg.ItemCount))
+	set := make(map[string]struct{}, int(cfg.Bloom.ExpectedCapacity))
 	for _, key := range seedKeys {
 		f.Add(key)
 		set[string(key)] = struct{}{}
 	}
 
-	missKeys := makeMissKeys(cfg.ItemCount)
+	missKeys := makeMissKeys(cfg.Bloom.ExpectedCapacity)
 	repeats := cfg.LookupRepeats
 	totalOps := len(missKeys) * repeats
 
@@ -249,18 +246,18 @@ func compareContainsMixed(cfg Config) (Comparison, error) {
 		return Comparison{}, fmt.Errorf("benchcompare: LookupHitRatio must be in [0, 1]")
 	}
 
-	seedKeys := makeKeys(cfg.ItemCount)
-	f, err := bloom.NewFilter(cfg.targetBloomConfig())
+	seedKeys := makeKeys(cfg.Bloom.ExpectedCapacity)
+	f, err := bloom.NewFilter(cfg.Bloom)
 	if err != nil {
 		return Comparison{}, err
 	}
-	set := make(map[string]struct{}, int(cfg.ItemCount))
+	set := make(map[string]struct{}, int(cfg.Bloom.ExpectedCapacity))
 	for _, key := range seedKeys {
 		f.Add(key)
 		set[string(key)] = struct{}{}
 	}
 
-	lookupKeys := makeMixedLookupKeys(cfg.ItemCount, hitRatio)
+	lookupKeys := makeMixedLookupKeys(cfg.Bloom.ExpectedCapacity, hitRatio)
 	repeats := cfg.LookupRepeats
 	totalOps := len(lookupKeys) * repeats
 
@@ -318,13 +315,13 @@ func compareContainsMixed(cfg Config) (Comparison, error) {
 
 func compareMixedStream(cfg Config) (Comparison, error) {
 	// First half unique, second half repeats — typical dedup stream shape.
-	stream := makeMixedStream(cfg.ItemCount)
+	stream := makeMixedStream(cfg.Bloom.ExpectedCapacity)
 
-	f, err := bloom.NewFilter(cfg.targetBloomConfig())
+	f, err := bloom.NewFilter(cfg.Bloom)
 	if err != nil {
 		return Comparison{}, err
 	}
-	set := make(map[string]struct{}, int(cfg.ItemCount))
+	set := make(map[string]struct{}, int(cfg.Bloom.ExpectedCapacity))
 
 	var bloomFP int
 	bloomStart := time.Now()
@@ -354,7 +351,7 @@ func compareMixedStream(cfg Config) (Comparison, error) {
 	hashBytes := mapHeapBytes(set)
 
 	bloomAllocs := allocsPerOp(n, func() {
-		ff, err := bloom.NewFilter(cfg.targetBloomConfig())
+		ff, err := bloom.NewFilter(cfg.Bloom)
 		if err != nil {
 			panic(err)
 		}
@@ -366,7 +363,7 @@ func compareMixedStream(cfg Config) (Comparison, error) {
 		}
 	})
 	hashAllocs := allocsPerOp(n, func() {
-		ss := make(map[string]struct{}, int(cfg.ItemCount))
+		ss := make(map[string]struct{}, int(cfg.Bloom.ExpectedCapacity))
 		for _, key := range stream {
 			s := string(key)
 			if _, ok := ss[s]; ok {
@@ -396,13 +393,13 @@ func compareMixedStream(cfg Config) (Comparison, error) {
 }
 
 func compareRemove(cfg Config) (Comparison, error) {
-	keys := makeKeys(cfg.ItemCount)
+	keys := makeKeys(cfg.Bloom.ExpectedCapacity)
 
-	cf, err := bloom.NewCountingFilter(cfg.targetBloomConfig())
+	cf, err := bloom.NewCountingFilter(cfg.Bloom)
 	if err != nil {
 		return Comparison{}, err
 	}
-	set := make(map[string]struct{}, int(cfg.ItemCount))
+	set := make(map[string]struct{}, int(cfg.Bloom.ExpectedCapacity))
 	for _, key := range keys {
 		if err := cf.Add(key); err != nil {
 			return Comparison{}, err
@@ -428,7 +425,7 @@ func compareRemove(cfg Config) (Comparison, error) {
 	n := len(keys)
 
 	bloomAllocs := allocsPerOp(n, func() {
-		ff, err := bloom.NewCountingFilter(cfg.targetBloomConfig())
+		ff, err := bloom.NewCountingFilter(cfg.Bloom)
 		if err != nil {
 			panic(err)
 		}
@@ -442,7 +439,7 @@ func compareRemove(cfg Config) (Comparison, error) {
 		}
 	})
 	hashAllocs := allocsPerOp(n, func() {
-		ss := make(map[string]struct{}, int(cfg.ItemCount))
+		ss := make(map[string]struct{}, int(cfg.Bloom.ExpectedCapacity))
 		for _, key := range keys {
 			ss[string(key)] = struct{}{}
 		}

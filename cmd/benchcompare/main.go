@@ -6,15 +6,12 @@ import (
 	"os"
 
 	"github.com/dannysecurity/bloomlab/benchcompare"
-	"github.com/dannysecurity/bloomlab/bloom"
+	"github.com/dannysecurity/bloomlab/cmd/internal/filterflags"
 )
 
 func main() {
-	n := flag.Uint64("n", 100_000, "expected item count for Bloom filter sizing")
-	p := flag.Float64("p", 0.01, "target false positive rate (0, 1)")
+	filter := filterflags.Register(100_000)
 	repeats := flag.Int("repeats", 4, "lookup repetitions for contains scenarios")
-	hashName := flag.String("hash", "fnv", "Bloom hash strategy: fnv, murmur3, xxhash")
-	seed := flag.Uint64("seed", 0, "Bloom hash seed")
 	sweepFPR := flag.Bool("sweep-fpr", false, "compare add workload across FPR targets instead of all scenarios")
 	sweepHash := flag.Bool("sweep-hash", false, "compare add workload across hash strategies instead of all scenarios")
 	sweepSize := flag.Bool("sweep-size", false, "compare add workload across item counts instead of all scenarios")
@@ -27,22 +24,15 @@ func main() {
 	markdown := flag.Bool("markdown", false, "emit markdown table instead of plain text")
 	flag.Parse()
 
-	strategy, err := bloom.ParseStrategy(*hashName)
+	bloomCfg, err := filter.Config()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "benchcompare: %v\n", err)
 		os.Exit(1)
 	}
 
-	cfg := benchcompare.Config{
-		ItemCount:         *n,
-		FalsePositiveRate: *p,
-		LookupRepeats:     *repeats,
-		LookupHitRatio:    *hitRatio,
-		Hash: bloom.HashConfig{
-			Strategy: strategy,
-			Seed:     *seed,
-		},
-	}
+	cfg := benchcompare.NewConfig(bloomCfg)
+	cfg.LookupRepeats = *repeats
+	cfg.LookupHitRatio = *hitRatio
 
 	if *sweepMix {
 		ratios, err := benchcompare.ParseLookupMixRatios(*mixValues)

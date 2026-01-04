@@ -3,6 +3,8 @@ package benchcompare
 import (
 	"strings"
 	"testing"
+
+	"github.com/dannysecurity/bloomlab/bloom"
 )
 
 func TestParseFPRRatesTable(t *testing.T) {
@@ -96,7 +98,7 @@ func TestParseFPRRatesTable(t *testing.T) {
 }
 
 func TestCompareFPRSweepValidationTable(t *testing.T) {
-	cfg := Config{ItemCount: 500, LookupRepeats: 1}
+	cfg := Config{Bloom: bloom.TargetConfig(500, 0.01), LookupRepeats: 1}
 	tests := []struct {
 		name    string
 		rates   []float64

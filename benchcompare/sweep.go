@@ -22,7 +22,7 @@ func CompareFPRSweep(cfg Config, rates []float64) ([]Comparison, error) {
 			return nil, fmt.Errorf("benchcompare: FPR sweep rate %v must be in (0, 1)", p)
 		}
 		sweepCfg := cfg
-		sweepCfg.FalsePositiveRate = p
+		sweepCfg.Bloom = sweepCfg.Bloom.WithFalsePositiveRate(p)
 		cmp, err := compareAdd(sweepCfg)
 		if err != nil {
 			return nil, err

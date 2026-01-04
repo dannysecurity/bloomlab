@@ -6,15 +6,21 @@ import (
 	"os"
 
 	"github.com/dannysecurity/bloomlab/bloom"
+	"github.com/dannysecurity/bloomlab/cmd/internal/filterflags"
 )
 
 func main() {
-	n := flag.Uint64("n", 10_000, "expected number of distinct inserts")
-	p := flag.Float64("p", 0.01, "target false positive rate in (0, 1)")
+	filter := filterflags.Register(10_000)
 	at := flag.Uint64("at", 0, "evaluate theory FPR at this insert count (default: n)")
 	flag.Parse()
 
-	plan, err := bloom.PlanSizing(*n, *p)
+	bloomCfg, err := filter.Config()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "fprcalc: %v\n", err)
+		os.Exit(1)
+	}
+
+	plan, err := bloom.PlanSizing(bloomCfg.ExpectedCapacity, bloomCfg.FalsePositiveRate)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "fprcalc: %v\n", err)
 		os.Exit(1)
@@ -23,9 +29,9 @@ func main() {
 
 	inserts := *at
 	if inserts == 0 {
-		inserts = *n
+		inserts = bloomCfg.ExpectedCapacity
 	}
-	if inserts != *n {
+	if inserts != bloomCfg.ExpectedCapacity {
 		fpr := bloom.TheoryFalsePositiveRate(inserts, plan.Bits, plan.HashCount)
 		fill := bloom.TheoryFillFraction(inserts, plan.Bits, plan.HashCount)
 		fmt.Printf(

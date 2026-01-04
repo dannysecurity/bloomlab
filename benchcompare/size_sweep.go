@@ -23,7 +23,7 @@ func CompareSizeSweep(cfg Config, counts []uint64) ([]Comparison, error) {
 			return nil, fmt.Errorf("benchcompare: size sweep count must be > 0")
 		}
 		sweepCfg := cfg
-		sweepCfg.ItemCount = n
+		sweepCfg.Bloom = sweepCfg.Bloom.WithExpectedCapacity(n)
 		cmp, err := compareAdd(sweepCfg)
 		if err != nil {
 			return nil, err
