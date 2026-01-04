@@ -14,6 +14,7 @@ import (
 func main() {
 	flags := filterflags.Register(100_000)
 	quiet := flag.Bool("quiet", false, "print summary only")
+	novelOnly := flag.Bool("novel-only", false, "emit first-seen URLs only")
 	normalize := flag.Bool("normalize", false, "canonicalize URLs (scheme/host case, default ports, trailing slashes, fragments)")
 	stripQuery := flag.Bool("strip-query", false, "ignore query strings when deduplicating")
 	stripTracking := flag.Bool("strip-tracking", false, "drop common marketing/click-tracking query parameters (utm_*, fbclid, gclid, etc.)")
@@ -55,8 +56,9 @@ func main() {
 
 	d := streamdedup.New(f, keyFn)
 	if err := streamdedup.Run(d, os.Stdin, streamdedup.RunOptions{
-		Quiet:  *quiet,
-		Format: format,
+		Quiet:     *quiet,
+		NovelOnly: *novelOnly,
+		Format:    format,
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "urldedup: %v\n", err)
 		os.Exit(1)

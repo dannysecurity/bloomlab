@@ -189,10 +189,12 @@ go run ./cmd/countingdemo -remove alpha
 printf '%s\n' 'alpha' 'beta' 'alpha' | go run ./cmd/streamdedup
 printf '%s\n' 'Alpha' 'alpha' | go run ./cmd/streamdedup -ignore-case
 printf '%s\n' 'log-a' 'log-b' 'log-a' | go run ./cmd/streamdedup -json
+printf '%s\n' 'a' 'b' 'a' 'c' | go run ./cmd/streamdedup -novel-only
 
 # URL stream deduper — same check-then-insert flow with optional URL canonicalization
 printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/urldedup
 printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/urldedup -quiet
+printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/urldedup -novel-only
 
 # URL dedup with canonicalization (case, ports, trailing slashes, fragments)
 printf '%s\n' 'https://Example.com/' 'http://example.com:80' | go run ./cmd/urldedup -normalize

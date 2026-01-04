@@ -18,10 +18,11 @@ const (
 
 // RunOptions configures stream processing and output.
 type RunOptions struct {
-	Quiet  bool
-	Format Format
-	Out    io.Writer
-	ErrOut io.Writer
+	Quiet     bool
+	NovelOnly bool // emit first-seen lines only; skip duplicates
+	Format    Format
+	Out       io.Writer
+	ErrOut    io.Writer
 }
 
 func (o *RunOptions) out() io.Writer {
@@ -50,7 +51,7 @@ func Run(d *Deduper, in io.Reader, opts RunOptions) error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		isDup, ok := d.Classify(line)
-		if !ok || opts.Quiet {
+		if !ok || opts.Quiet || (opts.NovelOnly && isDup) {
 			continue
 		}
 		if err := writeResult(out, opts.Format, isDup, line); err != nil {

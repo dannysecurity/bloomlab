@@ -13,6 +13,7 @@ import (
 func main() {
 	flags := filterflags.Register(100_000)
 	quiet := flag.Bool("quiet", false, "print summary only")
+	novelOnly := flag.Bool("novel-only", false, "emit first-seen lines only")
 	ignoreCase := flag.Bool("ignore-case", false, "compare lines case-insensitively")
 	jsonOut := flag.Bool("json", false, "emit one JSON object per line on stdout")
 	flag.Parse()
@@ -46,8 +47,9 @@ func main() {
 
 	d := streamdedup.New(f, keyFn)
 	if err := streamdedup.Run(d, os.Stdin, streamdedup.RunOptions{
-		Quiet:  *quiet,
-		Format: format,
+		Quiet:     *quiet,
+		NovelOnly: *novelOnly,
+		Format:    format,
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "streamdedup: %v\n", err)
 		os.Exit(1)
