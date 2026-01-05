@@ -23,7 +23,7 @@ func Register(defaultCapacity uint64) *Flags {
 	return &Flags{
 		Capacity:     flag.Uint64("n", defaultCapacity, "expected number of items"),
 		FPR:          flag.Float64("p", 0.01, "target false positive rate"),
-		Hash:         flag.String("hash", "fnv", "hash strategy: fnv, murmur3, xxhash"),
+		Hash:         flag.String("hash", "fnv", "hash strategy: fnv, murmur3, xxhash, wyhash"),
 		Seed:         flag.Uint64("seed", 0, "hash seed for independent filters"),
 		MinBits:      flag.Uint64("min-bits", 0, "minimum bit count for target sizing (0 = default)"),
 		MaxHashCount: flag.Uint("max-k", 0, "maximum hash functions for target sizing (0 = default)"),

@@ -18,6 +18,8 @@ func TestParseStrategy(t *testing.T) {
 		{"Murmur", HashMurmur3},
 		{"xxhash", HashXXHash},
 		{"xxh64", HashXXHash},
+		{"wyhash", HashWyhash},
+		{"wy", HashWyhash},
 	}
 	for _, tt := range tests {
 		got, err := ParseStrategy(tt.in)
@@ -54,7 +56,7 @@ func TestHasherDeterministic(t *testing.T) {
 
 func TestHasherSeedAffectsOutput(t *testing.T) {
 	key := []byte("seed-sensitivity")
-	for _, strategy := range []Strategy{HashMurmur3, HashXXHash} {
+	for _, strategy := range []Strategy{HashMurmur3, HashXXHash, HashWyhash} {
 		t.Run(strategy.String(), func(t *testing.T) {
 			a1, a2 := NewHasher(strategy, 0).Derive(key)
 			b1, b2 := NewHasher(strategy, 99).Derive(key)
@@ -88,6 +90,28 @@ func TestXXHashGoldenVectors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {
 			h1, h2 := NewHasher(HashXXHash, tt.seed).Derive([]byte(tt.key))
+			if h1 != tt.h1 || h2 != tt.h2 {
+				t.Fatalf("Derive(%q, %d) = (%#x, %#x), want (%#x, %#x)",
+					tt.key, tt.seed, h1, h2, tt.h1, tt.h2)
+			}
+		})
+	}
+}
+
+func TestWyhashGoldenVectors(t *testing.T) {
+	tests := []struct {
+		key  string
+		seed uint64
+		h1   uint64
+		h2   uint64
+	}{
+		{"", 0, 0x0, 0x82eb3a1667734cee},
+		{"alpha", 0, 0x20fa1908dd5af84e, 0xa9bc628f7e9a1129},
+		{"alpha", 42, 0xe43ad249323c9032, 0xc8d46741cc844940},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			h1, h2 := NewHasher(HashWyhash, tt.seed).Derive([]byte(tt.key))
 			if h1 != tt.h1 || h2 != tt.h2 {
 				t.Fatalf("Derive(%q, %d) = (%#x, %#x), want (%#x, %#x)",
 					tt.key, tt.seed, h1, h2, tt.h1, tt.h2)
@@ -181,84 +205,25 @@ func TestHashDistribution(t *testing.T) {
 	const k = 8
 	const samples = 20_000
 
-	t.Run("murmur3", func(t *testing.T) {
-		buckets := make([]int, m)
-		h := NewHasher(HashMurmur3, 0)
+	keyFor := func(i int) []byte {
+		return []byte(fmt.Sprintf("key-%d-%d", i, i*7919))
+	}
 
-		for i := 0; i < samples; i++ {
-			key := []byte(fmt.Sprintf("key-%d-%d", i, i*7919))
-			h1, h2 := h.Derive(key)
-			for j := uint(0); j < k; j++ {
-				buckets[bitIndex(h1, h2, m, j)]++
+	for _, strategy := range AllStrategies() {
+		t.Run(strategy.String(), func(t *testing.T) {
+			spread := MeasureBucketSpread(NewHasher(strategy, 0), m, k, samples, keyFor)
+			if strategy == HashFNV {
+				if spread.EmptyBuckets > m/8 {
+					t.Fatalf("%d of %d buckets never hit; indexing may be degenerate", spread.EmptyBuckets, m)
+				}
+				return
 			}
-		}
-
-		expected := float64(samples*k) / float64(m)
-		minCount, maxCount := buckets[0], buckets[0]
-		for _, count := range buckets[1:] {
-			if count < minCount {
-				minCount = count
+			if !spread.WithinSpreadTolerance(4) {
+				t.Fatalf("bucket spread [%d, %d] outside 4x of mean %.1f",
+					spread.MinCount, spread.MaxCount, spread.MeanCount)
 			}
-			if count > maxCount {
-				maxCount = count
-			}
-		}
-
-		if float64(minCount) < expected/4 || float64(maxCount) > expected*4 {
-			t.Fatalf("bucket spread [%d, %d] outside [%.0f, %.0f] for mean %.1f",
-				minCount, maxCount, expected/4, expected*4, expected)
-		}
-	})
-
-	t.Run("fnv_coverage", func(t *testing.T) {
-		seen := make([]bool, m)
-		h := NewHasher(HashFNV, 0)
-		for i := 0; i < samples; i++ {
-			key := []byte(fmt.Sprintf("key-%d", i))
-			h1, h2 := h.Derive(key)
-			for j := uint(0); j < k; j++ {
-				seen[bitIndex(h1, h2, m, j)] = true
-			}
-		}
-		empty := 0
-		for _, hit := range seen {
-			if !hit {
-				empty++
-			}
-		}
-		if empty > m/8 {
-			t.Fatalf("%d of %d buckets never hit; indexing may be degenerate", empty, m)
-		}
-	})
-
-	t.Run("xxhash", func(t *testing.T) {
-		buckets := make([]int, m)
-		h := NewHasher(HashXXHash, 0)
-
-		for i := 0; i < samples; i++ {
-			key := []byte(fmt.Sprintf("key-%d-%d", i, i*7919))
-			h1, h2 := h.Derive(key)
-			for j := uint(0); j < k; j++ {
-				buckets[bitIndex(h1, h2, m, j)]++
-			}
-		}
-
-		expected := float64(samples*k) / float64(m)
-		minCount, maxCount := buckets[0], buckets[0]
-		for _, count := range buckets[1:] {
-			if count < minCount {
-				minCount = count
-			}
-			if count > maxCount {
-				maxCount = count
-			}
-		}
-
-		if float64(minCount) < expected/4 || float64(maxCount) > expected*4 {
-			t.Fatalf("bucket spread [%d, %d] outside [%.0f, %.0f] for mean %.1f",
-				minCount, maxCount, expected/4, expected*4, expected)
-		}
-	})
+		})
+	}
 }
 
 func TestConfigHasherDefaultIsFNV(t *testing.T) {

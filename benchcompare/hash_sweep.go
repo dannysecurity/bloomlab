@@ -13,6 +13,7 @@ var DefaultHashSweepStrategies = []bloom.Strategy{
 	bloom.HashFNV,
 	bloom.HashMurmur3,
 	bloom.HashXXHash,
+	bloom.HashWyhash,
 }
 
 // CompareHashSweep runs the add scenario for each hash strategy and returns one

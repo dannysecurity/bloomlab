@@ -60,7 +60,7 @@ func TestCompareAddAllocatesLessThanHashSet(t *testing.T) {
 
 func TestCompareHashSweep(t *testing.T) {
 	cfg := Config{Bloom: bloom.TargetConfig(2_000, 0.01), LookupRepeats: 1}
-	strategies := []bloom.Strategy{bloom.HashFNV, bloom.HashMurmur3, bloom.HashXXHash}
+	strategies := []bloom.Strategy{bloom.HashFNV, bloom.HashMurmur3, bloom.HashXXHash, bloom.HashWyhash}
 	results, err := CompareHashSweep(cfg, strategies)
 	if err != nil {
 		t.Fatal(err)
@@ -87,15 +87,15 @@ func TestCompareHashSweepInvalidStrategy(t *testing.T) {
 }
 
 func TestParseHashStrategies(t *testing.T) {
-	strategies, err := ParseHashStrategies("fnv, murmur3 ,xxhash")
+	strategies, err := ParseHashStrategies("fnv, murmur3 ,xxhash,wyhash")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(strategies) != 3 {
-		t.Fatalf("got %d strategies, want 3", len(strategies))
+	if len(strategies) != 4 {
+		t.Fatalf("got %d strategies, want 4", len(strategies))
 	}
-	if strategies[2] != bloom.HashXXHash {
-		t.Fatalf("strategies[2] = %v, want xxhash", strategies[2])
+	if strategies[3] != bloom.HashWyhash {
+		t.Fatalf("strategies[3] = %v, want wyhash", strategies[3])
 	}
 	_, err = ParseHashStrategies("")
 	if err == nil {

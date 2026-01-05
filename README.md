@@ -249,7 +249,7 @@ go run ./cmd/benchcompare -hash murmur3 -seed 42 -n 10000
 
 # Sweep hash families to compare Bloom add throughput at fixed sizing
 go run ./cmd/benchcompare -sweep-hash -n 50000
-go run ./cmd/benchcompare -sweep-hash -hash-values fnv,murmur3,xxhash -markdown
+go run ./cmd/benchcompare -sweep-hash -hash-values fnv,murmur3,xxhash,wyhash -markdown
 
 # Sweep item counts to see how hash set footprint scales vs fixed Bloom sizing
 go run ./cmd/benchcompare -sweep-size
@@ -319,6 +319,7 @@ Bit positions use **double hashing**: `h(i) = (h1 + i·h2) mod m`. Hash settings
 | `HashFNV` | `fnv` | Default; FNV-1a 64-bit (backward compatible; seed ignored) |
 | `HashMurmur3` | `murmur3` | MurmurHash3 64-bit with independent seeds for `h1`/`h2` |
 | `HashXXHash` | `xxhash` | xxHash 64-bit with independent seeds for `h1`/`h2` |
+| `HashWyhash` | `wyhash` | wyhash final v1 64-bit with independent seeds for `h1`/`h2` |
 
 ```go
 f, _ := bloom.NewFilter(bloom.TargetConfig(10_000, 0.01,
@@ -327,9 +328,19 @@ f, _ := bloom.NewFilter(bloom.TargetConfig(10_000, 0.01,
 ))
 ```
 
+Compare hash uniformity before picking a strategy:
+
+```go
+spread := bloom.MeasureBucketSpread(cfg.Hasher(), m, k, 10_000, func(i int) []byte {
+	return []byte(fmt.Sprintf("key-%d", i))
+})
+fmt.Println(spread.ChiSquared, spread.WithinSpreadTolerance(4))
+best := bloom.BestUniformStrategy(m, k, 10_000, keyFor, bloom.AllStrategies())
+```
+
 When `m` is a power of two, indexing uses a bitmask fast path instead of modulo. Changing strategy or seed changes bit positions — filters are not interoperable across hash settings.
 
-Demo CLIs accept `-hash fnv|murmur3|xxhash` and `-seed <uint64>`.
+Demo CLIs accept `-hash fnv|murmur3|xxhash|wyhash` and `-seed <uint64>`.
 
 ## License
 

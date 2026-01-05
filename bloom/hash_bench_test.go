@@ -32,6 +32,16 @@ func BenchmarkHasherDeriveXXHash(b *testing.B) {
 	}
 }
 
+func BenchmarkHasherDeriveWyhash(b *testing.B) {
+	h := NewHasher(HashWyhash, 0)
+	key := []byte("benchmark-key-for-hash-derive")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key[0] = byte(i)
+		_, _ = h.Derive(key)
+	}
+}
+
 func BenchmarkFilterAddMurmur3(b *testing.B) {
 	cfg := TargetConfig(100_000, 0.01, WithHash(HashMurmur3))
 	f, _ := NewFilter(cfg)

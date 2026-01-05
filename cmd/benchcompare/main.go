@@ -17,7 +17,7 @@ func main() {
 	sweepSize := flag.Bool("sweep-size", false, "compare add workload across item counts instead of all scenarios")
 	sweepMix := flag.Bool("sweep-mix", false, "compare mixed lookup workload across hit ratios instead of all scenarios")
 	pValues := flag.String("p-values", "0.001,0.01,0.1", "comma-separated FPR targets for -sweep-fpr")
-	hashValues := flag.String("hash-values", "fnv,murmur3,xxhash", "comma-separated hash strategies for -sweep-hash")
+	hashValues := flag.String("hash-values", "fnv,murmur3,xxhash,wyhash", "comma-separated hash strategies for -sweep-hash")
 	sizeValues := flag.String("size-values", "10000,50000,100000,500000", "comma-separated item counts for -sweep-size")
 	mixValues := flag.String("mix-values", "0,0.25,0.5,0.75,1", "comma-separated lookup hit ratios for -sweep-mix")
 	hitRatio := flag.Float64("hit-ratio", 0.5, "fraction of lookup keys present for contains_mixed scenario")

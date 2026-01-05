@@ -15,11 +15,13 @@ const (
 	HashMurmur3
 	// HashXXHash uses xxHash 64-bit with independent seeds for h1 and h2.
 	HashXXHash
+	// HashWyhash uses wyhash final v1 64-bit with independent seeds for h1 and h2.
+	HashWyhash
 )
 
 // AllStrategies returns every built-in hash strategy in stable order.
 func AllStrategies() []Strategy {
-	return []Strategy{HashFNV, HashMurmur3, HashXXHash}
+	return []Strategy{HashFNV, HashMurmur3, HashXXHash, HashWyhash}
 }
 
 // String returns the CLI-friendly strategy name.
@@ -31,6 +33,8 @@ func (s Strategy) String() string {
 		return "murmur3"
 	case HashXXHash:
 		return "xxhash"
+	case HashWyhash:
+		return "wyhash"
 	default:
 		return fmt.Sprintf("strategy(%d)", int(s))
 	}
@@ -45,8 +49,10 @@ func ParseStrategy(name string) (Strategy, error) {
 		return HashMurmur3, nil
 	case "xxhash", "xxh64", "xxh":
 		return HashXXHash, nil
+	case "wyhash", "wy":
+		return HashWyhash, nil
 	default:
-		return 0, fmt.Errorf("bloom: unknown hash strategy %q (want fnv, murmur3, or xxhash)", name)
+		return 0, fmt.Errorf("bloom: unknown hash strategy %q (want fnv, murmur3, xxhash, or wyhash)", name)
 	}
 }
 
@@ -65,6 +71,8 @@ func NewHasher(strategy Strategy, seed uint64) Hasher {
 		return murmur3Hasher{seed: seed}
 	case HashXXHash:
 		return xxhashHasher{seed: seed}
+	case HashWyhash:
+		return wyhashHasher{seed: seed}
 	default:
 		return fnvHasher{}
 	}
