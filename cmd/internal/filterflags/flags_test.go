@@ -2,6 +2,7 @@ package filterflags
 
 import (
 	"flag"
+	"strings"
 	"testing"
 
 	"github.com/dannysecurity/bloomlab/bloom"
@@ -67,5 +68,99 @@ func TestFlagsCountingConfigInvalidCounterWidth(t *testing.T) {
 
 	if _, err := f.Config(); err == nil {
 		t.Fatal("expected error for invalid counter width")
+	}
+}
+
+func TestFlagsConfigTable(t *testing.T) {
+	tests := []struct {
+		name    string
+		counting bool
+		args    []string
+		check   func(t *testing.T, cfg bloom.Config)
+		wantErr string
+	}{
+		{
+			name: "default fnv strategy",
+			args: nil,
+			check: func(t *testing.T, cfg bloom.Config) {
+				if cfg.Hash.Strategy != bloom.HashFNV {
+					t.Fatalf("Hash.Strategy = %v, want fnv", cfg.Hash.Strategy)
+				}
+			},
+		},
+		{
+			name: "xxhash with seed and bounds",
+			args: []string{"-hash", "xxhash", "-seed", "42", "-min-bits", "512", "-max-k", "12"},
+			check: func(t *testing.T, cfg bloom.Config) {
+				if cfg.Hash.Strategy != bloom.HashXXHash || cfg.Hash.Seed != 42 {
+					t.Fatalf("Hash = %+v, want xxhash seed=42", cfg.Hash)
+				}
+				if cfg.MinBits != 512 || cfg.MaxHashCount != 12 {
+					t.Fatalf("bounds = minBits=%d maxK=%d, want 512 and 12", cfg.MinBits, cfg.MaxHashCount)
+				}
+			},
+		},
+		{
+			name: "wyhash strategy",
+			args: []string{"-hash", "wyhash"},
+			check: func(t *testing.T, cfg bloom.Config) {
+				if cfg.Hash.Strategy != bloom.HashWyhash {
+					t.Fatalf("Hash.Strategy = %v, want wyhash", cfg.Hash.Strategy)
+				}
+			},
+		},
+		{
+			name:    "invalid hash strategy",
+			args:    []string{"-hash", "sha256"},
+			wantErr: "unknown hash strategy",
+		},
+		{
+			name:     "counting 16-bit counter",
+			counting: true,
+			args:     []string{"-counter-width", "16"},
+			check: func(t *testing.T, cfg bloom.Config) {
+				if cfg.CounterWidth != 16 {
+					t.Fatalf("CounterWidth = %d, want 16", cfg.CounterWidth)
+				}
+			},
+		},
+		{
+			name:     "counting invalid counter width",
+			counting: true,
+			args:     []string{"-counter-width", "32"},
+			wantErr:  "counter-width must be 8 or 16",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+			var f *Flags
+			if tt.counting {
+				f = RegisterCounting(1000)
+			} else {
+				f = Register(1000)
+			}
+			if err := flag.CommandLine.Parse(tt.args); err != nil {
+				t.Fatal(err)
+			}
+
+			cfg, err := f.Config()
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("Config() error = %q, want substring %q", err.Error(), tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tt.check != nil {
+				tt.check(t, cfg)
+			}
+		})
 	}
 }

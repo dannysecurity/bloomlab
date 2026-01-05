@@ -16,28 +16,31 @@ func TestKeyWithoutOptions(t *testing.T) {
 
 func TestKeyNormalize(t *testing.T) {
 	tests := []struct {
+		name string
 		in   string
 		want string
 	}{
-		{"https://Example.COM:443/path/", "https://example.com/path"},
-		{"http://HOST:80/a/", "http://host/a"},
-		{"HTTPS://a.test#frag", "https://a.test/"},
-		{"example.com/page", "https://example.com/page"},
-		{"not a url at all", "not a url at all"},
-		{"https://a.test/", "https://a.test/"},
-		{"//Example.com/path/", "https://example.com/path"},
-		{"//HOST:443/a", "https://host/a"},
+		{name: "https default port and path trim", in: "https://Example.COM:443/path/", want: "https://example.com/path"},
+		{name: "http default port", in: "http://HOST:80/a/", want: "http://host/a"},
+		{name: "drop fragment", in: "HTTPS://a.test#frag", want: "https://a.test/"},
+		{name: "schemeless host", in: "example.com/page", want: "https://example.com/page"},
+		{name: "unparseable passthrough", in: "not a url at all", want: "not a url at all"},
+		{name: "already canonical", in: "https://a.test/", want: "https://a.test/"},
+		{name: "scheme relative", in: "//Example.com/path/", want: "https://example.com/path"},
+		{name: "scheme relative default port", in: "//HOST:443/a", want: "https://host/a"},
 	}
 
 	opts := Options{Normalize: true}
 	for _, tc := range tests {
-		got, ok := Key(tc.in, opts)
-		if !ok {
-			t.Fatalf("Key(%q) ok=false", tc.in)
-		}
-		if got != tc.want {
-			t.Errorf("Key(%q) = %q, want %q", tc.in, got, tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := Key(tc.in, opts)
+			if !ok {
+				t.Fatalf("Key(%q) ok=false", tc.in)
+			}
+			if got != tc.want {
+				t.Errorf("Key(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
 	}
 }
 
