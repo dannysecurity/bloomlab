@@ -8,7 +8,8 @@ A Go toolkit for [Bloom filters](https://en.wikipedia.org/wiki/Bloom_filter): sp
 - **Counting Bloom filter** (`bloom.CountingFilter`) — supports deletion via per-bit counters
 - **Benchmarks** — add, lookup, and remove throughput
 - **benchcompare** — programmatic Bloom filter vs `map[string]struct{}` comparison with CLI and Go benchmarks
-- **Demo CLIs** — `bloomdemo`, `countingdemo`, `streamdedup`, `urldedup`, `fprcalc`, and `benchcompare` for interactive exploration
+- **dedup** — check-then-insert stream dedup over standard or counting Bloom filters
+- **Demo CLIs** — `bloomdemo`, `countingdemo`, `streamdedup`, `countingdedup`, `urldedup`, `fprcalc`, and `benchcompare` for interactive exploration
 
 ## Install
 
@@ -191,6 +192,11 @@ printf '%s\n' 'Alpha' 'alpha' | go run ./cmd/streamdedup -ignore-case
 printf '%s\n' 'log-a' 'log-b' 'log-a' | go run ./cmd/streamdedup -json
 printf '%s\n' 'a' 'b' 'a' 'c' | go run ./cmd/streamdedup -novel-only
 
+# Counting stream deduper — same flow with removable keys (prefix lines with -)
+printf '%s\n' 'alpha' 'beta' 'alpha' '-alpha' 'alpha' | go run ./cmd/countingdedup
+printf '%s\n' 'Alpha' 'alpha' | go run ./cmd/countingdedup -ignore-case
+printf '%s\n' 'x' 'x' '-x' 'x' | go run ./cmd/countingdedup -json
+
 # URL stream deduper — same check-then-insert flow with optional URL canonicalization
 printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/urldedup
 printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/urldedup -quiet
@@ -228,6 +234,23 @@ go test -bench=Footprint -benchmem ./bloom/
 ```
 
 Bloom filters trade exact membership and per-insert heap allocations for a fixed bit slice; hash sets allocate per key but offer O(1) exact lookups with lower constant factors.
+
+### dedup subsystem
+
+The `dedup` package implements the check-then-insert pattern shared by the stream dedup CLIs: classify each line as novel or duplicate, optionally emit results, and print filter stats on stderr. `Classifier` wraps a standard Bloom filter; `CountingClassifier` adds `Remove` for sliding-window workloads where keys leave the set.
+
+```go
+f, _ := bloom.NewFilter(bloom.TargetConfig(10_000, 0.01))
+c := dedup.NewClassifier(f, dedup.TrimKey)
+dup, ok := c.Classify("user:42") // first sight → dup=false, ok=true
+
+cf, _ := bloom.NewCountingFilter(bloom.TargetConfig(10_000, 0.01))
+cc := dedup.NewCountingClassifier(cf, nil)
+_, _, _ = cc.Classify("session-a")
+cc.Remove("session-a") // key can be seen again as novel
+```
+
+The `countingdedup` CLI reads stdin and treats lines prefixed with `-` (override with `-remove-prefix`) as removals instead of classifications.
 
 ### benchcompare subsystem
 
