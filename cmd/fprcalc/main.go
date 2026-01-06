@@ -12,6 +12,7 @@ import (
 func main() {
 	filter := filterflags.Register(10_000)
 	at := flag.Uint64("at", 0, "evaluate theory FPR at this insert count (default: n)")
+	derive := flag.Bool("derive", false, "print step-by-step false-positive math")
 	flag.Parse()
 
 	bloomCfg, err := filter.Config()
@@ -26,6 +27,10 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println(plan)
+	if *derive {
+		fmt.Println()
+		fmt.Print(bloom.FormatSizingDerivation(plan))
+	}
 
 	inserts := *at
 	if inserts == 0 {

@@ -109,11 +109,29 @@ Given target capacity `n` and desired FPR upper bound `p`, bloomlab picks `m` (b
 - `m = -n · ln(p) / (ln 2)²`
 - `k = (m/n) · ln 2` (rounded, with a minimum of 1)
 
-This `(m, k)` pair is optimal for fixed `n` and `m`: the achieved rate is close to `(1/2)^k`. The formulas appear in `optimalM` / `optimalK` inside `bloom/config.go`.
+This `(m, k)` pair is optimal for fixed `n` and `m`: the achieved rate is close to `(1/2)^k`. The formulas appear in `optimalM` / `optimalK` inside `bloom/config.go`; `ContinuousOptimalM` / `ContinuousOptimalK` in `bloom/fpr_derivation.go` expose the real-valued values before truncation.
 
-To derive `m`: substitute the continuous optimum `k* = (m/n) ln 2` into `p ≈ (1/2)^(m/n ln 2)` and solve for `m`.
+#### Inverse sizing (deriving `m` from `p`)
 
-`PlanSizing(n, p)` resolves `(m, k)` and reports the achieved theoretical FPR and fill fraction at capacity in one call.
+At the continuous optimum, set `k* = (m/n) · ln 2`. Then `kn/m = ln 2`, so the fill fraction is `f = 1 - e^(-ln 2) = 1/2` and the false-positive rate becomes:
+
+```
+p ≈ f^k* = (1/2)^k* = 2^(-(m/n)·ln 2) = e^(-(m/n)·(ln 2)²)
+```
+
+Take natural logs and solve for `m`:
+
+```
+ln(p) = -(m/n) · (ln 2)²   →   m = -n · ln(p) / (ln 2)²
+```
+
+Then `k = round((m/n) · ln 2)` (minimum 1). Integer truncation of `m` and rounding of `k` can push the achieved rate slightly above the target — bloomlab checks this with `TheoryFalsePositiveRate` after sizing.
+
+`PlanSizing(n, p)` resolves `(m, k)` and reports the achieved theoretical FPR and fill fraction at capacity in one call. For a numbered walkthrough with your inputs, use `FormatSizingDerivation` or:
+
+```bash
+go run ./cmd/fprcalc -n 10000 -p 0.01 -derive
+```
 
 ### Worked example (`n = 10_000`, `p = 0.01`)
 
@@ -213,6 +231,7 @@ printf '%s\n' 'https://a.test/one' 'https://a.test/two' | go run ./cmd/urldedup 
 
 # Sizing calculator — show m, k, fill fraction, and theory FPR for a target
 go run ./cmd/fprcalc -n 10000 -p 0.01
+go run ./cmd/fprcalc -n 10000 -p 0.01 -derive   # step-by-step FPR math
 go run ./cmd/fprcalc -n 5000 -p 0.001 -at 7500
 ```
 
@@ -320,6 +339,8 @@ go test -bench=ReportMetrics ./benchcompare/
 | `TheoryFalsePositiveRate(n, m, k)` | Theoretical FPR after `n` inserts |
 | `TheoryFillFraction(n, m, k)` | Expected fraction of bits set after `n` inserts |
 | `PlanSizing(n, p, opts...)` | Resolve `(m, k)` and report achieved theory FPR at capacity |
+| `FormatSizingDerivation(plan)` | Render numbered FPR derivation steps for a sizing plan |
+| `ContinuousOptimalM(n, p)` / `ContinuousOptimalK(m, n)` | Real-valued sizing before truncation |
 | `Config.TheoryFPRAt(n)` | FPR for a config at a given insert count |
 | `Filter.TheoryFPR()` / `CountingFilter.TheoryFPR()` | FPR at current insert count |
 | `Config.Validate()` / `Config.Size()` | Inspect or resolve sizing before construction |
