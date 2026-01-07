@@ -170,6 +170,43 @@ func TestCountingFilterMaxCounter(t *testing.T) {
 	}
 }
 
+func TestCountingFilterOccupiedCount(t *testing.T) {
+	cf, err := NewCounting(64, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cf.OccupiedCount(); got != 0 {
+		t.Fatalf("empty filter OccupiedCount() = %d, want 0", got)
+	}
+
+	if err := cf.Add([]byte("a")); err != nil {
+		t.Fatal(err)
+	}
+	occupied := cf.OccupiedCount()
+	if occupied == 0 || occupied > cf.BitCount() {
+		t.Fatalf("after add OccupiedCount() = %d, want in (0, %d]", occupied, cf.BitCount())
+	}
+
+	if err := cf.Add([]byte("b")); err != nil {
+		t.Fatal(err)
+	}
+	if got := cf.OccupiedCount(); got < occupied {
+		t.Fatalf("after second add OccupiedCount() = %d, want >= %d", got, occupied)
+	}
+
+	if !cf.Remove([]byte("a")) {
+		t.Fatal("remove should succeed")
+	}
+	if got := cf.OccupiedCount(); got == 0 {
+		t.Fatal("after removing one of two keys OccupiedCount() = 0, want > 0")
+	}
+
+	cf.Clear()
+	if got := cf.OccupiedCount(); got != 0 {
+		t.Fatalf("after clear OccupiedCount() = %d, want 0", got)
+	}
+}
+
 func TestCountingFilterFillRatio(t *testing.T) {
 	cf, err := NewCounting(64, 2)
 	if err != nil {
@@ -182,8 +219,12 @@ func TestCountingFilterFillRatio(t *testing.T) {
 	if err := cf.Add([]byte("a")); err != nil {
 		t.Fatal(err)
 	}
-	if ratio := cf.FillRatio(); ratio <= 0 || ratio > 1 {
+	ratio := cf.FillRatio()
+	if ratio <= 0 || ratio > 1 {
 		t.Fatalf("after add fill ratio = %v, want in (0, 1]", ratio)
+	}
+	if want := float64(cf.OccupiedCount()) / float64(cf.BitCount()); ratio != want {
+		t.Fatalf("FillRatio() = %v, want OccupiedCount/BitCount = %v", ratio, want)
 	}
 
 	if !cf.Remove([]byte("a")) {

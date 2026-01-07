@@ -51,7 +51,7 @@ func NewCountingFromTarget(expectedCapacity uint64, falsePositiveRate float64) (
 	return NewCountingFilter(TargetConfig(expectedCapacity, falsePositiveRate))
 }
 
-// CounterWidth returns the per-bit counter width in bytes (8 or 16).
+// CounterWidth returns the per-bit counter width in bits (8 or 16).
 func (cf *CountingFilter) CounterWidth() uint8 { return cf.width }
 
 // Add increments counters for key.
@@ -158,8 +158,8 @@ func (cf *CountingFilter) MaxCounter() uint64 {
 	return max
 }
 
-// FillRatio returns the fraction of counters that are non-zero.
-func (cf *CountingFilter) FillRatio() float64 {
+// OccupiedCount returns the number of counters that are non-zero.
+func (cf *CountingFilter) OccupiedCount() uint64 {
 	var occupied uint64
 	if cf.width == 16 {
 		for _, c := range cf.counters16 {
@@ -167,14 +167,19 @@ func (cf *CountingFilter) FillRatio() float64 {
 				occupied++
 			}
 		}
-	} else {
-		for _, c := range cf.counters8 {
-			if c > 0 {
-				occupied++
-			}
+		return occupied
+	}
+	for _, c := range cf.counters8 {
+		if c > 0 {
+			occupied++
 		}
 	}
-	return float64(occupied) / float64(cf.m)
+	return occupied
+}
+
+// FillRatio returns the fraction of counters that are non-zero.
+func (cf *CountingFilter) FillRatio() float64 {
+	return float64(cf.OccupiedCount()) / float64(cf.m)
 }
 
 func (cf *CountingFilter) counterAt(idx uint64) uint64 {
