@@ -117,6 +117,51 @@ func BenchmarkMapSetContainsMiss(b *testing.B) {
 	}
 }
 
+// Dedup-stream benchmarks mirror the check-then-insert pattern used by streamdedup:
+// first half of keys are unique, second half repeats earlier keys.
+const benchStreamLen = 10_000
+
+func benchMixedStream(n int) [][]byte {
+	half := n / 2
+	stream := make([][]byte, n)
+	for i := 0; i < half; i++ {
+		stream[i] = []byte(fmt.Sprintf("stream-%d", i))
+	}
+	for i := half; i < n; i++ {
+		stream[i] = []byte(fmt.Sprintf("stream-%d", i%half))
+	}
+	return stream
+}
+
+func BenchmarkFilterDedupStream(b *testing.B) {
+	stream := benchMixedStream(benchStreamLen)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f, _ := New(benchStreamLen, 0.01)
+		for _, key := range stream {
+			if f.Contains(key) {
+				continue
+			}
+			f.Add(key)
+		}
+	}
+}
+
+func BenchmarkMapSetDedupStream(b *testing.B) {
+	stream := benchMixedStream(benchStreamLen)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		set := make(map[string]struct{}, benchStreamLen/2)
+		for _, key := range stream {
+			s := string(key)
+			if _, ok := set[s]; ok {
+				continue
+			}
+			set[s] = struct{}{}
+		}
+	}
+}
+
 // Footprint benchmarks report storage-bytes/item alongside a steady lookup loop so
 // `go test -bench=Footprint -benchmem ./bloom/` compares space use at equal capacity.
 func BenchmarkFilterStorageFootprint(b *testing.B) {
