@@ -76,6 +76,41 @@ func TestFNVSeedIgnored(t *testing.T) {
 	}
 }
 
+func TestMurmur3GoldenVectors(t *testing.T) {
+	tests := []struct {
+		key  string
+		seed uint64
+		h1   uint64
+		h2   uint64
+	}{
+		{"", 0, 0x0, 0x9ca066f1a4ab2eea},
+		{"alpha", 0, 0xff80f427ed2eda4c, 0xfc3ebfc92760afa2},
+		{"alpha", 42, 0x3424b7db13f4e2c7, 0xe7c89d9881b502d7},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			h1, h2 := NewHasher(HashMurmur3, tt.seed).Derive([]byte(tt.key))
+			if h1 != tt.h1 || h2 != tt.h2 {
+				t.Fatalf("Derive(%q, %d) = (%#x, %#x), want (%#x, %#x)",
+					tt.key, tt.seed, h1, h2, tt.h1, tt.h2)
+			}
+		})
+	}
+}
+
+func TestPairDerivedSeeds(t *testing.T) {
+	seed1, seed2 := pairDerivedSeeds(42)
+	if seed1 != 42 {
+		t.Fatalf("seed1 = %d, want 42", seed1)
+	}
+	if seed2 != 42^doubleHashSeedMix {
+		t.Fatalf("seed2 = %#x, want %#x", seed2, 42^doubleHashSeedMix)
+	}
+	if seed1 == seed2 {
+		t.Fatal("h1 and h2 seeds must differ")
+	}
+}
+
 func TestXXHashGoldenVectors(t *testing.T) {
 	tests := []struct {
 		key  string

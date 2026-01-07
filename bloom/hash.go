@@ -87,6 +87,15 @@ func bitIndex(h1, h2 uint64, m uint64, i uint) uint64 {
 	return sum % m
 }
 
+// doubleHashSeedMix separates the two independent hash passes used in double hashing.
+// It is the 64-bit golden-ratio constant also used by SplitMix64-style seed expansion.
+const doubleHashSeedMix = uint64(0x9e3779b97f4a7c15)
+
+// pairDerivedSeeds returns independent seeds for h1 and h2 from a filter seed.
+func pairDerivedSeeds(seed uint64) (seed1, seed2 uint64) {
+	return seed, seed ^ doubleHashSeedMix
+}
+
 // ensureH2NonZero guarantees h2 is usable for double hashing (h2 must not be 0).
 func ensureH2NonZero(h2 uint64) uint64 {
 	if h2 == 0 {

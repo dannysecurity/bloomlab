@@ -12,9 +12,9 @@ type wyhashHasher struct {
 func (w wyhashHasher) Strategy() Strategy { return HashWyhash }
 
 func (w wyhashHasher) Derive(key []byte) (h1, h2 uint64) {
-	const mix = uint64(0x9e3779b97f4a7c15)
-	h1 = wyhash64(key, w.seed)
-	h2 = ensureH2NonZero(wyhash64(key, w.seed^mix))
+	seed1, seed2 := pairDerivedSeeds(w.seed)
+	h1 = wyhash64(key, seed1)
+	h2 = ensureH2NonZero(wyhash64(key, seed2))
 	return h1, h2
 }
 

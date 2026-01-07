@@ -12,9 +12,9 @@ type murmur3Hasher struct {
 func (m murmur3Hasher) Strategy() Strategy { return HashMurmur3 }
 
 func (m murmur3Hasher) Derive(key []byte) (h1, h2 uint64) {
-	const mix = uint64(0x9e3779b97f4a7c15)
-	h1 = murmur3_64(key, m.seed)
-	h2 = ensureH2NonZero(murmur3_64(key, m.seed^mix))
+	seed1, seed2 := pairDerivedSeeds(m.seed)
+	h1 = murmur3_64(key, seed1)
+	h2 = ensureH2NonZero(murmur3_64(key, seed2))
 	return h1, h2
 }
 

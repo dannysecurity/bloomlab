@@ -12,9 +12,9 @@ type xxhashHasher struct {
 func (x xxhashHasher) Strategy() Strategy { return HashXXHash }
 
 func (x xxhashHasher) Derive(key []byte) (h1, h2 uint64) {
-	const mix = uint64(0x9e3779b97f4a7c15)
-	h1 = xxhash64(key, x.seed)
-	h2 = ensureH2NonZero(xxhash64(key, x.seed^mix))
+	seed1, seed2 := pairDerivedSeeds(x.seed)
+	h1 = xxhash64(key, seed1)
+	h2 = ensureH2NonZero(xxhash64(key, seed2))
 	return h1, h2
 }
 
