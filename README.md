@@ -372,6 +372,7 @@ Bit positions use **double hashing**: `h(i) = (h1 + i·h2) mod m`. Hash settings
 | `HashMurmur3` | `murmur3` | MurmurHash3 64-bit with independent seeds for `h1`/`h2` |
 | `HashXXHash` | `xxhash` | xxHash 64-bit with independent seeds for `h1`/`h2` |
 | `HashWyhash` | `wyhash` | wyhash final v1 64-bit with independent seeds for `h1`/`h2` |
+| `HashHighway` | `highway` | HighwayHash-128 single-pass derivation (seed-sensitive; keyed PRF) |
 
 ```go
 f, _ := bloom.NewFilter(bloom.TargetConfig(10_000, 0.01,
@@ -390,9 +391,20 @@ fmt.Println(spread.ChiSquared, spread.WithinSpreadTolerance(4))
 best := bloom.BestUniformStrategy(m, k, 10_000, keyFor, bloom.AllStrategies())
 ```
 
+Tune seeds and pick a strategy for a planned layout:
+
+```go
+opts := bloom.TuneOptions{
+	M: m, K: k, Samples: 10_000,
+	KeyFor: func(i int) []byte { return []byte(fmt.Sprintf("key-%d", i)) },
+}
+report := bloom.RecommendHasher(opts, bloom.AllStrategies(), bloom.DefaultTuneSeeds())
+fmt.Println(report.Best.Strategy, report.Best.Seed, report.Best.Spread.ChiSquared)
+```
+
 When `m` is a power of two, indexing uses a bitmask fast path instead of modulo. Changing strategy or seed changes bit positions — filters are not interoperable across hash settings.
 
-Demo CLIs accept `-hash fnv|murmur3|xxhash|wyhash` and `-seed <uint64>`.
+Demo CLIs accept `-hash fnv|murmur3|xxhash|wyhash|highway` and `-seed <uint64>`.
 
 ## License
 

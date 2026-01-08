@@ -17,11 +17,13 @@ const (
 	HashXXHash
 	// HashWyhash uses wyhash final v1 64-bit with independent seeds for h1 and h2.
 	HashWyhash
+	// HashHighway uses HighwayHash-128 in a single pass for h1 and h2 (seed-sensitive).
+	HashHighway
 )
 
 // AllStrategies returns every built-in hash strategy in stable order.
 func AllStrategies() []Strategy {
-	return []Strategy{HashFNV, HashMurmur3, HashXXHash, HashWyhash}
+	return []Strategy{HashFNV, HashMurmur3, HashXXHash, HashWyhash, HashHighway}
 }
 
 // String returns the CLI-friendly strategy name.
@@ -35,6 +37,8 @@ func (s Strategy) String() string {
 		return "xxhash"
 	case HashWyhash:
 		return "wyhash"
+	case HashHighway:
+		return "highway"
 	default:
 		return fmt.Sprintf("strategy(%d)", int(s))
 	}
@@ -51,8 +55,10 @@ func ParseStrategy(name string) (Strategy, error) {
 		return HashXXHash, nil
 	case "wyhash", "wy":
 		return HashWyhash, nil
+	case "highway", "highwayhash", "hwy":
+		return HashHighway, nil
 	default:
-		return 0, fmt.Errorf("bloom: unknown hash strategy %q (want fnv, murmur3, xxhash, or wyhash)", name)
+		return 0, fmt.Errorf("bloom: unknown hash strategy %q (want fnv, murmur3, xxhash, wyhash, or highway)", name)
 	}
 }
 
@@ -73,6 +79,8 @@ func NewHasher(strategy Strategy, seed uint64) Hasher {
 		return xxhashHasher{seed: seed}
 	case HashWyhash:
 		return wyhashHasher{seed: seed}
+	case HashHighway:
+		return highwayHasher{key: expandSeedToHighwayKey(seed)}
 	default:
 		return fnvHasher{}
 	}
