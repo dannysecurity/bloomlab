@@ -21,7 +21,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	plan, err := bloom.PlanSizing(bloomCfg.ExpectedCapacity, bloomCfg.FalsePositiveRate)
+	plan, err := bloom.PlanSizingFrom(bloomCfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "fprcalc: %v\n", err)
 		os.Exit(1)

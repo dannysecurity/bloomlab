@@ -127,7 +127,7 @@ ln(p) = -(m/n) · (ln 2)²   →   m = -n · ln(p) / (ln 2)²
 
 Then `k = round((m/n) · ln 2)` (minimum 1). Integer truncation of `m` and rounding of `k` can push the achieved rate slightly above the target — bloomlab checks this with `TheoryFalsePositiveRate` after sizing.
 
-`PlanSizing(n, p)` resolves `(m, k)` and reports the achieved theoretical FPR and fill fraction at capacity in one call. For a numbered walkthrough with your inputs, use `FormatSizingDerivation` or:
+`PlanSizing(n, p)` resolves `(m, k)` and reports the achieved theoretical FPR and fill fraction at capacity in one call. When you already have a `bloom.Config` (for example from CLI flags), use `PlanSizingFrom(cfg)` so `-min-bits` and `-max-k` bounds are honored. For a numbered walkthrough with your inputs, use `FormatSizingDerivation` or:
 
 ```bash
 go run ./cmd/fprcalc -n 10000 -p 0.01 -derive
@@ -151,7 +151,7 @@ go run ./cmd/fprcalc -n 10000 -p 0.01
 ```
 
 ```go
-plan, _ := bloom.PlanSizing(10_000, 0.01)
+plan, _ := bloom.PlanSizingFrom(bloom.TargetConfig(10_000, 0.01))
 fmt.Println(plan)
 // target n=10000 p=0.01 -> m=95850 (9.59 bits/item) k=6
 // at capacity: fill≈0.465 (46.5%), theory FPR≈0.01014 (1.014%)
@@ -328,17 +328,23 @@ go test -bench=ReportMetrics ./benchcompare/
 
 ### Configuration
 
+Sizing mode is explicit on `bloom.Config`: call `Mode()` for `SizingTarget` or `SizingExplicit`, or use `Target()` / `Explicit()` to read the typed inputs. `Bounds()` returns target-mode limits (`SizingBounds` with package defaults via `Resolved()`).
+
 | Helper | Use when |
 |--------|----------|
 | `TargetConfig(n, p, opts...)` | Derive `m` and `k` from expected capacity and FPR |
 | `ExplicitConfig(m, k, opts...)` | Fix bit count and hash functions directly |
-| `WithHash(strategy)` / `WithSeed(seed)` / `WithHashConfig(h)` | Set hash family, seed, or full hash config |
+| `Config.Mode()` / `Target()` / `Explicit()` | Inspect sizing mode and inputs |
+| `Config.Bounds()` / `SizingBounds.Resolved()` | Read or resolve target sizing limits |
+| `WithHash(strategy)` / `WithSeed(seed)` / `WithHashConfig(h)` | Set hash family, seed, or full hash config at construction |
+| `Config.WithSeed` / `WithMinBits` / `WithMaxHashCount` / `WithCounterWidth` / `WithHashConfig` | Immutable copy updates after construction |
 | `WithMinBits(m)` / `WithMaxHashCount(k)` | Bound derived sizing on target configs |
 | `WithCounterWidth(8\|16)` | Select counter width for counting filters |
 | `HashConfig` | Hash-only settings (`Strategy`, `Seed`); embedded in `Config.Hash` |
 | `TheoryFalsePositiveRate(n, m, k)` | Theoretical FPR after `n` inserts |
 | `TheoryFillFraction(n, m, k)` | Expected fraction of bits set after `n` inserts |
-| `PlanSizing(n, p, opts...)` | Resolve `(m, k)` and report achieved theory FPR at capacity |
+| `PlanSizing(n, p, opts...)` | Resolve `(m, k)` from capacity and FPR |
+| `PlanSizingFrom(cfg)` | Resolve sizing from an existing config (honors bounds) |
 | `FormatSizingDerivation(plan)` | Render numbered FPR derivation steps for a sizing plan |
 | `ContinuousOptimalM(n, p)` / `ContinuousOptimalK(m, n)` | Real-valued sizing before truncation |
 | `Config.TheoryFPRAt(n)` | FPR for a config at a given insert count |
@@ -346,6 +352,8 @@ go test -bench=ReportMetrics ./benchcompare/
 | `Config.Validate()` / `Config.Size()` | Inspect or resolve sizing before construction |
 | `NewFilter(cfg)` / `NewCountingFilter(cfg)` | Primary constructors |
 | `New(n, p)` / `NewCountingFromTarget(n, p)` | Legacy shorthands for target sizing |
+
+CLIs share filter flags via `cmd/internal/filterflags`: target sizing uses `-n`/`-p`; explicit sizing uses `-m`/`-k`. Stream dedup tools share output flags via `cmd/internal/streamflags` (`-quiet`, `-json`, `-ignore-case`, `-novel-only`).
 
 Target sizing uses:
 

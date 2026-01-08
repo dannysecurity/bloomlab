@@ -82,3 +82,31 @@ func TestPlanSizingString(t *testing.T) {
 		}
 	}
 }
+
+func TestPlanSizingFromRespectsBounds(t *testing.T) {
+	cfg := TargetConfig(100_000, 0.001, WithMinBits(256), WithMaxHashCount(8))
+	plan, err := PlanSizingFrom(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Bits < 256 {
+		t.Errorf("Bits = %d, want >= 256", plan.Bits)
+	}
+	if plan.HashCount > 8 {
+		t.Errorf("HashCount = %d, want <= 8", plan.HashCount)
+	}
+
+	direct, err := PlanSizing(100_000, 0.001, WithMinBits(256), WithMaxHashCount(8))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan != direct {
+		t.Fatalf("PlanSizingFrom = %+v, PlanSizing = %+v", plan, direct)
+	}
+}
+
+func TestPlanSizingFromRejectsExplicitConfig(t *testing.T) {
+	if _, err := PlanSizingFrom(ExplicitConfig(128, 4)); err != ErrInvalidCapacity {
+		t.Fatalf("PlanSizingFrom(explicit) = %v, want ErrInvalidCapacity", err)
+	}
+}

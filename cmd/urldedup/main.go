@@ -8,18 +8,17 @@ import (
 	"github.com/dannysecurity/bloomlab/bloom"
 	"github.com/dannysecurity/bloomlab/cmd/internal/filterflags"
 	"github.com/dannysecurity/bloomlab/cmd/internal/streamdedup"
+	"github.com/dannysecurity/bloomlab/cmd/internal/streamflags"
 	"github.com/dannysecurity/bloomlab/cmd/internal/urldedup"
 )
 
 func main() {
 	flags := filterflags.Register(100_000)
-	quiet := flag.Bool("quiet", false, "print summary only")
-	novelOnly := flag.Bool("novel-only", false, "emit first-seen URLs only")
+	stream := streamflags.Register()
 	normalize := flag.Bool("normalize", false, "canonicalize URLs (scheme/host case, default ports, trailing slashes, fragments)")
 	stripQuery := flag.Bool("strip-query", false, "ignore query strings when deduplicating")
 	stripTracking := flag.Bool("strip-tracking", false, "drop common marketing/click-tracking query parameters (utm_*, fbclid, gclid, etc.)")
 	domainOnly := flag.Bool("domain-only", false, "deduplicate by host name only, ignoring path and query")
-	jsonOut := flag.Bool("json", false, "emit one JSON object per line on stdout")
 	flag.Parse()
 
 	cfg, err := flags.Config()
@@ -49,17 +48,8 @@ func main() {
 		return urldedup.Key(line, opts)
 	}
 
-	format := streamdedup.FormatText
-	if *jsonOut {
-		format = streamdedup.FormatJSON
-	}
-
 	d := streamdedup.New(f, keyFn)
-	if err := streamdedup.Run(d, os.Stdin, streamdedup.RunOptions{
-		Quiet:     *quiet,
-		NovelOnly: *novelOnly,
-		Format:    format,
-	}); err != nil {
+	if err := streamdedup.Run(d, os.Stdin, streamdedup.RunOptions(stream.RunOptions())); err != nil {
 		fmt.Fprintf(os.Stderr, "urldedup: %v\n", err)
 		os.Exit(1)
 	}

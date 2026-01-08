@@ -5,7 +5,7 @@ import "errors"
 var ErrCounterOverflow = errors.New("bloom: counter overflow")
 
 // CountingFilter supports deletion by tracking per-bit counters instead of bits.
-// Counters default to uint8; use Config.WithCounterWidth(16) for a wider variant
+// Counters default to uint8; use WithCounterWidth(16) or Config.WithCounterWidth(16) for a wider variant
 // that tolerates more duplicate inserts before ErrCounterOverflow.
 type CountingFilter struct {
 	counters8  []uint8

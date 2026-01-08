@@ -7,16 +7,14 @@ import (
 
 	"github.com/dannysecurity/bloomlab/bloom"
 	"github.com/dannysecurity/bloomlab/cmd/internal/filterflags"
+	"github.com/dannysecurity/bloomlab/cmd/internal/streamflags"
 	"github.com/dannysecurity/bloomlab/dedup"
 )
 
 func main() {
 	flags := filterflags.RegisterCounting(100_000)
-	quiet := flag.Bool("quiet", false, "print summary only")
-	novelOnly := flag.Bool("novel-only", false, "emit first-seen lines only")
-	ignoreCase := flag.Bool("ignore-case", false, "compare lines case-insensitively")
+	stream := streamflags.Register()
 	removePrefix := flag.String("remove-prefix", "-", "lines with this prefix remove the remainder from the set instead of classifying")
-	jsonOut := flag.Bool("json", false, "emit one JSON object per line on stdout")
 	flag.Parse()
 
 	cfg, err := flags.Config()
@@ -36,23 +34,9 @@ func main() {
 		os.Exit(2)
 	}
 
-	keyFn := dedup.TrimKey
-	if *ignoreCase {
-		keyFn = dedup.IgnoreCaseKey
-	}
-
-	format := dedup.FormatText
-	if *jsonOut {
-		format = dedup.FormatJSON
-	}
-
-	c := dedup.NewCountingClassifier(cf, keyFn)
+	c := dedup.NewCountingClassifier(cf, stream.KeyFunc())
 	if err := dedup.RunCounting(c, os.Stdin, dedup.CountingRunOptions{
-		RunOptions: dedup.RunOptions{
-			Quiet:     *quiet,
-			NovelOnly: *novelOnly,
-			Format:    format,
-		},
+		RunOptions:   stream.RunOptions(),
 		RemovePrefix: *removePrefix,
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "countingdedup: %v\n", err)

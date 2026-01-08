@@ -8,14 +8,12 @@ import (
 	"github.com/dannysecurity/bloomlab/bloom"
 	"github.com/dannysecurity/bloomlab/cmd/internal/filterflags"
 	"github.com/dannysecurity/bloomlab/cmd/internal/streamdedup"
+	"github.com/dannysecurity/bloomlab/cmd/internal/streamflags"
 )
 
 func main() {
 	flags := filterflags.Register(100_000)
-	quiet := flag.Bool("quiet", false, "print summary only")
-	novelOnly := flag.Bool("novel-only", false, "emit first-seen lines only")
-	ignoreCase := flag.Bool("ignore-case", false, "compare lines case-insensitively")
-	jsonOut := flag.Bool("json", false, "emit one JSON object per line on stdout")
+	stream := streamflags.Register()
 	flag.Parse()
 
 	cfg, err := flags.Config()
@@ -35,22 +33,8 @@ func main() {
 		os.Exit(2)
 	}
 
-	keyFn := streamdedup.TrimKey
-	if *ignoreCase {
-		keyFn = streamdedup.IgnoreCaseKey
-	}
-
-	format := streamdedup.FormatText
-	if *jsonOut {
-		format = streamdedup.FormatJSON
-	}
-
-	d := streamdedup.New(f, keyFn)
-	if err := streamdedup.Run(d, os.Stdin, streamdedup.RunOptions{
-		Quiet:     *quiet,
-		NovelOnly: *novelOnly,
-		Format:    format,
-	}); err != nil {
+	d := streamdedup.New(f, stream.KeyFunc())
+	if err := streamdedup.Run(d, os.Stdin, streamdedup.RunOptions(stream.RunOptions())); err != nil {
 		fmt.Fprintf(os.Stderr, "streamdedup: %v\n", err)
 		os.Exit(1)
 	}

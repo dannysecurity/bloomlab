@@ -163,6 +163,36 @@ func (c Config) WithHashStrategy(strategy Strategy) Config {
 	return c
 }
 
+// WithSeed returns a copy with an updated hash seed.
+func (c Config) WithSeed(seed uint64) Config {
+	c.Hash.Seed = seed
+	return c
+}
+
+// WithHashConfig returns a copy with the given hash configuration.
+func (c Config) WithHashConfig(hash HashConfig) Config {
+	c.Hash = hash
+	return c
+}
+
+// WithMinBits returns a copy with an updated minimum bit count for target sizing.
+func (c Config) WithMinBits(minBits uint64) Config {
+	c.MinBits = minBits
+	return c
+}
+
+// WithMaxHashCount returns a copy with an updated maximum hash function count.
+func (c Config) WithMaxHashCount(maxK uint) Config {
+	c.MaxHashCount = maxK
+	return c
+}
+
+// WithCounterWidth returns a copy with the given per-bit counter width (8 or 16).
+func (c Config) WithCounterWidth(width uint8) Config {
+	c.CounterWidth = width
+	return c
+}
+
 // Validate checks that the configuration is usable.
 func (c Config) Validate() error {
 	if c.isExplicitSizing() {
@@ -241,15 +271,8 @@ func (c Config) validateCounterWidth() error {
 }
 
 func (c Config) bounds() (minBits uint64, maxK uint) {
-	minBits = c.MinBits
-	if minBits == 0 {
-		minBits = defaultMinBits
-	}
-	maxK = c.MaxHashCount
-	if maxK == 0 {
-		maxK = defaultMaxHashCount
-	}
-	return minBits, maxK
+	b := c.Bounds().Resolved()
+	return b.MinBits, b.MaxHashCount
 }
 
 func optimalM(n uint64, p float64, minBits uint64) uint64 {

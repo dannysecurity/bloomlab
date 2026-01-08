@@ -8,6 +8,28 @@ import (
 	"github.com/dannysecurity/bloomlab/bloom"
 )
 
+func TestFlagsConfigExplicitSizing(t *testing.T) {
+	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+	f := Register(1000)
+	if err := flag.CommandLine.Parse([]string{"-m", "512", "-k", "6", "-hash", "xxhash"}); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := f.Config()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Mode() != bloom.SizingExplicit {
+		t.Fatalf("Mode() = %v, want explicit", cfg.Mode())
+	}
+	if cfg.Bits != 512 || cfg.HashCount != 6 {
+		t.Fatalf("explicit sizing = m=%d k=%d, want 512 and 6", cfg.Bits, cfg.HashCount)
+	}
+	if cfg.Hash.Strategy != bloom.HashXXHash {
+		t.Fatalf("Hash.Strategy = %v, want xxhash", cfg.Hash.Strategy)
+	}
+}
+
 func TestFlagsConfigWithBounds(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 	f := Register(1000)
