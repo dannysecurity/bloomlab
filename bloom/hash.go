@@ -62,6 +62,27 @@ func ParseStrategy(name string) (Strategy, error) {
 	}
 }
 
+// ParseStrategyList parses comma-separated hash strategy names.
+func ParseStrategyList(raw string) ([]Strategy, error) {
+	parts := strings.Split(raw, ",")
+	strategies := make([]Strategy, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		s, err := ParseStrategy(part)
+		if err != nil {
+			return nil, err
+		}
+		strategies = append(strategies, s)
+	}
+	if len(strategies) == 0 {
+		return nil, fmt.Errorf("bloom: no hash strategies in %q", raw)
+	}
+	return strategies, nil
+}
+
 // Hasher derives the two 64-bit seeds used for double hashing:
 // bit index i is (h1 + i*h2) mod m.
 type Hasher interface {

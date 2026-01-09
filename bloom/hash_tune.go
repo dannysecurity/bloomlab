@@ -1,6 +1,12 @@
 package bloom
 
-import "math"
+import (
+	"fmt"
+	"math"
+	"strconv"
+	"strings"
+	"text/tabwriter"
+)
 
 // TuneOptions configures hash tuning analysis for a planned filter layout.
 type TuneOptions struct {
@@ -74,6 +80,142 @@ func CompareSeeds(strategy Strategy, opts TuneOptions, seeds []uint64) []SeedCan
 		}
 	}
 	return out
+}
+
+// TuneOptionsFromConfig builds spread-measurement options from a resolved filter config.
+func TuneOptionsFromConfig(cfg Config, samples int, keyPrefix string) (TuneOptions, error) {
+	m, k, err := cfg.Size()
+	if err != nil {
+		return TuneOptions{}, err
+	}
+	if samples <= 0 {
+		samples = 10_000
+	}
+	if keyPrefix == "" {
+		keyPrefix = "tune"
+	}
+	prefix := keyPrefix
+	return TuneOptions{
+		M:       m,
+		K:       k,
+		Samples: samples,
+		KeyFor: func(i int) []byte {
+			return []byte(fmt.Sprintf("%s-%d", prefix, i))
+		},
+	}, nil
+}
+
+// RecommendHasherFromConfig is a convenience wrapper around RecommendHasher.
+func RecommendHasherFromConfig(cfg Config, samples int, keyPrefix string, strategies []Strategy, seeds []uint64) (TuningReport, error) {
+	opts, err := TuneOptionsFromConfig(cfg, samples, keyPrefix)
+	if err != nil {
+		return TuningReport{}, err
+	}
+	return RecommendHasher(opts, strategies, seeds), nil
+}
+
+// BestHashConfig returns the recommended hash settings from a tuning report.
+func (r TuningReport) BestHashConfig() HashConfig {
+	return HashConfig{Strategy: r.Best.Strategy, Seed: r.Best.Seed}
+}
+
+// ParseSeeds parses comma-separated decimal or 0x-prefixed hex seeds.
+func ParseSeeds(raw string) ([]uint64, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	parts := strings.Split(raw, ",")
+	seeds := make([]uint64, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		seed, err := parseSeedValue(part)
+		if err != nil {
+			return nil, fmt.Errorf("bloom: parse seed %q: %w", part, err)
+		}
+		seeds = append(seeds, seed)
+	}
+	if len(seeds) == 0 {
+		return nil, fmt.Errorf("bloom: no seeds in %q", raw)
+	}
+	return seeds, nil
+}
+
+func parseSeedValue(raw string) (uint64, error) {
+	base := 10
+	if strings.HasPrefix(raw, "0x") || strings.HasPrefix(raw, "0X") {
+		base = 16
+		raw = raw[2:]
+	}
+	seed, err := strconv.ParseUint(raw, base, 64)
+	if err != nil {
+		return 0, err
+	}
+	return seed, nil
+}
+
+// FormatTuningReport renders a human-readable tuning summary.
+func FormatTuningReport(report TuningReport) string {
+	opts := report.Options
+	var b strings.Builder
+	fmt.Fprintf(&b, "Hash tuning for m=%d k=%d (%d probe keys)\n\n", opts.M, opts.K, opts.Samples)
+
+	if len(report.Strategies) > 0 {
+		fmt.Fprintln(&b, "Strategy comparison (lower chi² is more uniform):")
+		tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(tw, "STRATEGY\tSEED\tCHI²\tMIN\tMAX\tEMPTY")
+		for _, score := range report.Strategies {
+			spread := score.Spread
+			fmt.Fprintf(tw, "%s\t%d\t%.1f\t%d\t%d\t%d\n",
+				score.Strategy, score.Seed, spread.ChiSquared,
+				spread.MinCount, spread.MaxCount, spread.EmptyBuckets)
+		}
+		tw.Flush()
+	}
+
+	if len(report.Candidates) > 0 && len(report.Strategies) > 0 {
+		best := report.Candidates[0]
+		fmt.Fprintf(&b, "\nBest seed for %s: %d (chi²=%.1f)\n",
+			report.Strategies[0].Strategy, best.Seed, best.ChiSquared)
+	}
+
+	best := report.Best
+	fmt.Fprintf(&b, "\nRecommended: -hash %s", best.Strategy)
+	if best.Seed != 0 {
+		fmt.Fprintf(&b, " -seed %d", best.Seed)
+	}
+	fmt.Fprintf(&b, " (chi²=%.1f, empty=%d)\n", best.Spread.ChiSquared, best.Spread.EmptyBuckets)
+	return b.String()
+}
+
+// FormatTuningReportMarkdown renders the tuning summary as a markdown table.
+func FormatTuningReportMarkdown(report TuningReport) string {
+	opts := report.Options
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Hash tuning\n\n")
+	fmt.Fprintf(&b, "Layout `m=%d`, `k=%d`, `%d` probe keys.\n\n", opts.M, opts.K, opts.Samples)
+
+	if len(report.Strategies) > 0 {
+		fmt.Fprintln(&b, "| Strategy | Seed | Chi² | Min | Max | Empty |")
+		fmt.Fprintln(&b, "| --- | ---: | ---: | ---: | ---: | ---: |")
+		for _, score := range report.Strategies {
+			spread := score.Spread
+			fmt.Fprintf(&b, "| %s | %d | %.1f | %d | %d | %d |\n",
+				score.Strategy, score.Seed, spread.ChiSquared,
+				spread.MinCount, spread.MaxCount, spread.EmptyBuckets)
+		}
+	}
+
+	best := report.Best
+	fmt.Fprintf(&b, "\n**Recommended:** `-hash %s`", best.Strategy)
+	if best.Seed != 0 {
+		fmt.Fprintf(&b, " `-seed %d`", best.Seed)
+	}
+	fmt.Fprintf(&b, " (chi²=%.1f)\n", best.Spread.ChiSquared)
+	return b.String()
 }
 
 // RecommendHasher picks the best strategy/seed pair from the given strategies by chi-squared spread.

@@ -38,6 +38,22 @@ func TestParseStrategy(t *testing.T) {
 	}
 }
 
+func TestParseStrategyList(t *testing.T) {
+	strategies, err := ParseStrategyList("fnv, murmur3, xxhash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(strategies) != 3 {
+		t.Fatalf("got %d strategies, want 3", len(strategies))
+	}
+	if strategies[1] != HashMurmur3 {
+		t.Fatalf("strategies[1] = %v, want murmur3", strategies[1])
+	}
+	if _, err := ParseStrategyList(""); err == nil {
+		t.Fatal("expected error for empty list")
+	}
+}
+
 func TestHasherDeterministic(t *testing.T) {
 	key := []byte("bloomlab-determinism-check")
 
