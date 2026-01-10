@@ -18,6 +18,12 @@ type TuneOptions struct {
 	Samples int
 	// KeyFor maps sample indices to representative keys for the workload.
 	KeyFor func(i int) []byte
+	// PreferSpeed picks the fastest Derive among strategies within ChiMargin of
+	// the best chi-squared score instead of always picking lowest chi-squared.
+	PreferSpeed bool
+	// ChiMargin is the maximum chi-squared ratio (candidate/best) allowed when
+	// PreferSpeed is set. Values <= 0 default to 1.15 (15% above best).
+	ChiMargin float64
 }
 
 // SeedCandidate scores a single seed for bucket uniformity under double hashing.
@@ -29,9 +35,11 @@ type SeedCandidate struct {
 
 // StrategyScore ranks a hash strategy (optionally with a tuned seed).
 type StrategyScore struct {
-	Strategy Strategy
-	Seed     uint64
-	Spread   BucketSpread
+	Strategy    Strategy
+	Seed        uint64
+	Spread      BucketSpread
+	Overlap     ProbeOverlap
+	NsPerDerive float64
 }
 
 // TuningReport summarizes hash tuning results for a filter layout.
@@ -164,13 +172,18 @@ func FormatTuningReport(report TuningReport) string {
 	fmt.Fprintf(&b, "Hash tuning for m=%d k=%d (%d probe keys)\n\n", opts.M, opts.K, opts.Samples)
 
 	if len(report.Strategies) > 0 {
-		fmt.Fprintln(&b, "Strategy comparison (lower chi² is more uniform):")
+		header := "Strategy comparison (lower chi² is more uniform):"
+		if opts.PreferSpeed {
+			header = "Strategy comparison (prefer-speed: fastest within chi² margin):"
+		}
+		fmt.Fprintln(&b, header)
 		tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "STRATEGY\tSEED\tCHI²\tMIN\tMAX\tEMPTY")
+		fmt.Fprintln(tw, "STRATEGY\tSEED\tCHI²\tOVERLAP%\tNS/OP\tMIN\tMAX\tEMPTY")
 		for _, score := range report.Strategies {
 			spread := score.Spread
-			fmt.Fprintf(tw, "%s\t%d\t%.1f\t%d\t%d\t%d\n",
+			fmt.Fprintf(tw, "%s\t%d\t%.1f\t%.2f\t%.0f\t%d\t%d\t%d\n",
 				score.Strategy, score.Seed, spread.ChiSquared,
+				score.Overlap.OverlapRate*100, score.NsPerDerive,
 				spread.MinCount, spread.MaxCount, spread.EmptyBuckets)
 		}
 		tw.Flush()
@@ -187,7 +200,8 @@ func FormatTuningReport(report TuningReport) string {
 	if best.Seed != 0 {
 		fmt.Fprintf(&b, " -seed %d", best.Seed)
 	}
-	fmt.Fprintf(&b, " (chi²=%.1f, empty=%d)\n", best.Spread.ChiSquared, best.Spread.EmptyBuckets)
+	fmt.Fprintf(&b, " (chi²=%.1f, overlap=%.2f%%, ns/op=%.0f, empty=%d)\n",
+		best.Spread.ChiSquared, best.Overlap.OverlapRate*100, best.NsPerDerive, best.Spread.EmptyBuckets)
 	return b.String()
 }
 
@@ -199,12 +213,13 @@ func FormatTuningReportMarkdown(report TuningReport) string {
 	fmt.Fprintf(&b, "Layout `m=%d`, `k=%d`, `%d` probe keys.\n\n", opts.M, opts.K, opts.Samples)
 
 	if len(report.Strategies) > 0 {
-		fmt.Fprintln(&b, "| Strategy | Seed | Chi² | Min | Max | Empty |")
-		fmt.Fprintln(&b, "| --- | ---: | ---: | ---: | ---: | ---: |")
+		fmt.Fprintln(&b, "| Strategy | Seed | Chi² | Overlap % | ns/op | Min | Max | Empty |")
+		fmt.Fprintln(&b, "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
 		for _, score := range report.Strategies {
 			spread := score.Spread
-			fmt.Fprintf(&b, "| %s | %d | %.1f | %d | %d | %d |\n",
+			fmt.Fprintf(&b, "| %s | %d | %.1f | %.2f | %.0f | %d | %d | %d |\n",
 				score.Strategy, score.Seed, spread.ChiSquared,
+				score.Overlap.OverlapRate*100, score.NsPerDerive,
 				spread.MinCount, spread.MaxCount, spread.EmptyBuckets)
 		}
 	}
@@ -214,11 +229,14 @@ func FormatTuningReportMarkdown(report TuningReport) string {
 	if best.Seed != 0 {
 		fmt.Fprintf(&b, " `-seed %d`", best.Seed)
 	}
-	fmt.Fprintf(&b, " (chi²=%.1f)\n", best.Spread.ChiSquared)
+	fmt.Fprintf(&b, " (chi²=%.1f, overlap=%.2f%%, ns/op=%.0f)\n",
+		best.Spread.ChiSquared, best.Overlap.OverlapRate*100, best.NsPerDerive)
 	return b.String()
 }
 
-// RecommendHasher picks the best strategy/seed pair from the given strategies by chi-squared spread.
+// RecommendHasher picks the best strategy/seed pair from the given strategies.
+// By default it minimizes chi-squared bucket spread; set opts.PreferSpeed to
+// pick the fastest Derive among strategies within ChiMargin of the best chi².
 func RecommendHasher(opts TuneOptions, strategies []Strategy, seeds []uint64) TuningReport {
 	if len(strategies) == 0 {
 		strategies = AllStrategies()
@@ -237,12 +255,47 @@ func RecommendHasher(opts TuneOptions, strategies []Strategy, seeds []uint64) Tu
 	bestChi := math.MaxFloat64
 	for _, strategy := range strategies {
 		tuned := TuneSeed(strategy, opts, seeds)
-		score := StrategyScore{Strategy: strategy, Seed: tuned.Seed, Spread: tuned.Spread}
+		hasher := NewHasher(strategy, tuned.Seed)
+		score := StrategyScore{
+			Strategy:    strategy,
+			Seed:        tuned.Seed,
+			Spread:      tuned.Spread,
+			Overlap:     MeasureProbeOverlap(hasher, opts.M, opts.K, opts.Samples, opts.KeyFor),
+			NsPerDerive: MeasureDeriveNsPerOp(hasher, opts.Samples, opts.KeyFor),
+		}
 		report.Strategies = append(report.Strategies, score)
 		if tuned.ChiSquared < bestChi {
 			bestChi = tuned.ChiSquared
-			report.Best = score
 		}
+	}
+
+	margin := opts.ChiMargin
+	if margin <= 0 {
+		margin = 1.15
+	}
+	chiLimit := bestChi * margin
+
+	bestScore := StrategyScore{}
+	bestRank := math.MaxFloat64
+	foundBest := false
+	for _, score := range report.Strategies {
+		rank := score.Spread.ChiSquared
+		if opts.PreferSpeed {
+			if score.Spread.ChiSquared > chiLimit {
+				continue
+			}
+			rank = score.NsPerDerive
+		}
+		if rank < bestRank {
+			bestRank = rank
+			bestScore = score
+			foundBest = true
+		}
+	}
+	if foundBest {
+		report.Best = bestScore
+	} else if len(report.Strategies) > 0 {
+		report.Best = report.Strategies[0]
 	}
 	return report
 }

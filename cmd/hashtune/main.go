@@ -16,6 +16,8 @@ func main() {
 	seedsRaw := flag.String("seeds", "", "comma-separated candidate seeds (default: built-in ladder)")
 	hashValues := flag.String("hash-values", "", "comma-separated hash strategies (default: all)")
 	strategyOnly := flag.String("strategy", "", "tune seeds for one strategy only (skip cross-strategy comparison)")
+	preferSpeed := flag.Bool("prefer-speed", false, "pick fastest Derive among strategies within chi² margin")
+	chiMargin := flag.Float64("chi-margin", 1.15, "chi² ratio limit when -prefer-speed is set")
 	markdown := flag.Bool("markdown", false, "emit markdown table instead of plain text")
 	flag.Parse()
 
@@ -30,6 +32,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "hashtune: %v\n", err)
 		os.Exit(1)
 	}
+	opts.PreferSpeed = *preferSpeed
+	opts.ChiMargin = *chiMargin
 
 	seeds, err := bloom.ParseSeeds(*seedsRaw)
 	if err != nil {

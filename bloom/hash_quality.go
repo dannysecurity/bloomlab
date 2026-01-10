@@ -98,6 +98,56 @@ func CompareBucketSpread(m uint64, k uint, samples int, keyFor func(i int) []byt
 	return out
 }
 
+// ProbeOverlap summarizes duplicate bit probes within a single key's k hash positions.
+// Lower overlap rates indicate better use of the k probes under double hashing.
+type ProbeOverlap struct {
+	Samples         int
+	K               uint
+	TotalProbes     int
+	DuplicateProbes int
+	OverlapRate     float64
+}
+
+// MeasureProbeOverlap counts how often double-hash iterations for the same key
+// land on a bit index already probed for that key.
+func MeasureProbeOverlap(h Hasher, m uint64, k uint, samples int, keyFor func(i int) []byte) ProbeOverlap {
+	if samples <= 0 || k == 0 || m == 0 || keyFor == nil {
+		return ProbeOverlap{K: k}
+	}
+
+	total := 0
+	dupes := 0
+	for i := 0; i < samples; i++ {
+		key := keyFor(i)
+		if len(key) == 0 {
+			continue
+		}
+		seen := make(map[uint64]struct{}, k)
+		h1, h2 := h.Derive(key)
+		for j := uint(0); j < k; j++ {
+			idx := bitIndex(h1, h2, m, j)
+			total++
+			if _, ok := seen[idx]; ok {
+				dupes++
+			} else {
+				seen[idx] = struct{}{}
+			}
+		}
+	}
+
+	rate := 0.0
+	if total > 0 {
+		rate = float64(dupes) / float64(total)
+	}
+	return ProbeOverlap{
+		Samples:         samples,
+		K:               k,
+		TotalProbes:     total,
+		DuplicateProbes: dupes,
+		OverlapRate:     rate,
+	}
+}
+
 // BestUniformStrategy picks the strategy with the lowest chi-squared score.
 func BestUniformStrategy(m uint64, k uint, samples int, keyFor func(i int) []byte, strategies []Strategy) Strategy {
 	if len(strategies) == 0 {

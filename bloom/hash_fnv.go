@@ -14,7 +14,8 @@ func (fnvHasher) Derive(key []byte) (h1, h2 uint64) {
 
 	h.Reset()
 	_, _ = h.Write(key)
-	_, _ = h.Write([]byte{0})
+	var tail [1]byte
+	_, _ = h.Write(tail[:])
 	h2 = ensureH2NonZero(h.Sum64())
 	return h1, h2
 }
