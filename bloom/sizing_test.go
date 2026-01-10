@@ -32,6 +32,24 @@ func TestSizingMode(t *testing.T) {
 	if _, ok := explicit.Target(); ok {
 		t.Fatal("Target() = true for explicit config")
 	}
+
+	incomplete := ExplicitConfig(0, 4)
+	if incomplete.Mode() != SizingExplicit {
+		t.Fatalf("ExplicitConfig(0, k).Mode() = %v, want SizingExplicit", incomplete.Mode())
+	}
+	if _, ok := incomplete.Target(); ok {
+		t.Fatal("Target() = true for incomplete explicit config")
+	}
+	ies, ok := incomplete.Explicit()
+	if !ok {
+		t.Fatal("Explicit() = false for incomplete explicit config")
+	}
+	if ies.Bits != 0 || ies.HashCount != 4 {
+		t.Fatalf("Explicit() = %+v, want m=0 k=4", ies)
+	}
+	if err := incomplete.Validate(); err != ErrInvalidBits {
+		t.Fatalf("Validate() = %v, want ErrInvalidBits", err)
+	}
 }
 
 func TestSizingBoundsResolved(t *testing.T) {

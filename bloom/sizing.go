@@ -70,6 +70,8 @@ type ExplicitSpec struct {
 }
 
 // Mode reports whether the configuration uses target or explicit sizing.
+// Incomplete explicit configs (zero m with non-zero k) report SizingExplicit
+// even though Validate rejects them until m is positive.
 func (c Config) Mode() SizingMode {
 	if c.isExplicitSizing() {
 		return SizingExplicit

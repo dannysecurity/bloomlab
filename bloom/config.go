@@ -99,7 +99,8 @@ type Config struct {
 	ExpectedCapacity  uint64
 	FalsePositiveRate float64
 
-	// Bits (m) and HashCount (k) select explicit sizing when Bits is non-zero.
+	// Bits (m) and HashCount (k) select explicit sizing when Bits is non-zero or
+	// when HashCount is set without target inputs (see ExplicitConfig).
 	Bits      uint64
 	HashCount uint
 
@@ -135,14 +136,15 @@ func ExplicitConfig(bits uint64, hashCount uint, opts ...ConfigOption) Config {
 	return cfg
 }
 
-// isExplicitSizing reports whether m and k come from Bits and HashCount.
+// isExplicitSizing reports whether m and k come from Bits and HashCount,
+// including incomplete explicit configs that still lack positive m.
 func (c Config) isExplicitSizing() bool {
-	return c.Bits != 0
+	return c.Bits != 0 || c.isIncompleteExplicitSizing()
 }
 
 // isIncompleteExplicitSizing reports ExplicitConfig(0, k): hash count without positive m.
 func (c Config) isIncompleteExplicitSizing() bool {
-	return c.HashCount > 0 && c.ExpectedCapacity == 0 && c.FalsePositiveRate == 0
+	return c.Bits == 0 && c.HashCount > 0 && c.ExpectedCapacity == 0 && c.FalsePositiveRate == 0
 }
 
 // WithExpectedCapacity returns a copy with an updated target capacity.
@@ -195,11 +197,11 @@ func (c Config) WithCounterWidth(width uint8) Config {
 
 // Validate checks that the configuration is usable.
 func (c Config) Validate() error {
-	if c.isExplicitSizing() {
-		return nil
-	}
 	if c.isIncompleteExplicitSizing() {
 		return ErrInvalidBits
+	}
+	if c.isExplicitSizing() {
+		return nil
 	}
 	if c.ExpectedCapacity == 0 {
 		return ErrInvalidCapacity
