@@ -64,6 +64,24 @@ func TestCountingFilterOverflow(t *testing.T) {
 	}
 }
 
+func TestCountingFilterCounterLimit(t *testing.T) {
+	narrow, err := NewCounting(64, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := narrow.CounterLimit(); got != 255 {
+		t.Fatalf("8-bit CounterLimit() = %d, want 255", got)
+	}
+
+	wide, err := NewCountingFilter(ExplicitConfig(64, 2, WithCounterWidth(16)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := wide.CounterLimit(); got != 65535 {
+		t.Fatalf("16-bit CounterLimit() = %d, want 65535", got)
+	}
+}
+
 func TestCountingFilterWideCounterWidth(t *testing.T) {
 	cf, err := NewCountingFilter(ExplicitConfig(8, 1, WithCounterWidth(16)))
 	if err != nil {
@@ -93,6 +111,26 @@ func TestCountingFilterWideCounterWidth(t *testing.T) {
 	}
 	if !cf.Contains(key) {
 		t.Fatal("key should still appear present after one of 256 adds removed")
+	}
+}
+
+func TestCountingFilterWideCounterOverflow(t *testing.T) {
+	cf, err := NewCountingFilter(ExplicitConfig(8, 1, WithCounterWidth(16)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key := []byte("x")
+	for i := 0; i < 65535; i++ {
+		if err := cf.Add(key); err != nil {
+			t.Fatalf("add %d: %v", i, err)
+		}
+	}
+	if got := cf.MaxCounter(); got != 65535 {
+		t.Fatalf("MaxCounter() = %d, want 65535", got)
+	}
+	if err := cf.Add(key); err != ErrCounterOverflow {
+		t.Errorf("expected ErrCounterOverflow, got %v", err)
 	}
 }
 

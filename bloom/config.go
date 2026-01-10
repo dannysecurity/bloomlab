@@ -242,10 +242,18 @@ func (c Config) String() string {
 		return fmt.Sprintf("invalid config: %v", err)
 	}
 	hash := c.Hash.String()
+	width := c.counterWidthSuffix()
 	if c.isExplicitSizing() {
-		return fmt.Sprintf("explicit m=%d k=%d hash=%s", m, k, hash)
+		return fmt.Sprintf("explicit m=%d k=%d hash=%s%s", m, k, hash, width)
 	}
-	return fmt.Sprintf("target n=%d p=%g -> m=%d k=%d hash=%s", c.ExpectedCapacity, c.FalsePositiveRate, m, k, hash)
+	return fmt.Sprintf("target n=%d p=%g -> m=%d k=%d hash=%s%s", c.ExpectedCapacity, c.FalsePositiveRate, m, k, hash, width)
+}
+
+func (c Config) counterWidthSuffix() string {
+	if c.resolvedCounterWidth() == 16 {
+		return " counter-width=16"
+	}
+	return ""
 }
 
 func applyOptions(cfg *Config, opts []ConfigOption) {

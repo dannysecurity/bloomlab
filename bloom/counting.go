@@ -54,6 +54,15 @@ func NewCountingFromTarget(expectedCapacity uint64, falsePositiveRate float64) (
 // CounterWidth returns the per-bit counter width in bits (8 or 16).
 func (cf *CountingFilter) CounterWidth() uint8 { return cf.width }
 
+// CounterLimit returns the maximum value a single counter can hold before Add
+// returns ErrCounterOverflow (255 for 8-bit counters, 65535 for 16-bit).
+func (cf *CountingFilter) CounterLimit() uint64 {
+	if cf.width == 16 {
+		return 65535
+	}
+	return 255
+}
+
 // Add increments counters for key.
 func (cf *CountingFilter) Add(key []byte) error {
 	h1, h2 := cf.hasher.Derive(key)

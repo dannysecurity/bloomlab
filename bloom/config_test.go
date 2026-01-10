@@ -133,6 +133,11 @@ func TestConfigString(t *testing.T) {
 		t.Errorf("ExplicitConfig.String() = %q", s)
 	}
 
+	wide := ExplicitConfig(128, 4, WithCounterWidth(16))
+	if s := wide.String(); s != "explicit m=128 k=4 hash=fnv counter-width=16" {
+		t.Errorf("wide ExplicitConfig.String() = %q", s)
+	}
+
 	invalid := TargetConfig(0, 0.01)
 	if s := invalid.String(); s[:7] != "invalid" {
 		t.Errorf("invalid config String() = %q", s)
