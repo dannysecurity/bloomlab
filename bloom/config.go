@@ -79,6 +79,15 @@ func WithMaxHashCount(maxK uint) ConfigOption {
 	}
 }
 
+// WithSizingBounds sets target sizing bounds on a config. Zero fields use
+// package defaults when sizing is resolved (see SizingBounds.Resolved).
+func WithSizingBounds(bounds SizingBounds) ConfigOption {
+	return func(c *Config) {
+		c.MinBits = bounds.MinBits
+		c.MaxHashCount = bounds.MaxHashCount
+	}
+}
+
 // WithCounterWidth selects per-bit counter width for counting filters.
 // Supported values are 8 (default) and 16. Wider counters use more memory
 // but tolerate more duplicate inserts before ErrCounterOverflow.
@@ -186,6 +195,13 @@ func (c Config) WithMinBits(minBits uint64) Config {
 // WithMaxHashCount returns a copy with an updated maximum hash function count.
 func (c Config) WithMaxHashCount(maxK uint) Config {
 	c.MaxHashCount = maxK
+	return c
+}
+
+// WithSizingBounds returns a copy with updated target sizing bounds.
+func (c Config) WithSizingBounds(bounds SizingBounds) Config {
+	c.MinBits = bounds.MinBits
+	c.MaxHashCount = bounds.MaxHashCount
 	return c
 }
 

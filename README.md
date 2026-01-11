@@ -337,8 +337,8 @@ Sizing mode is explicit on `bloom.Config`: call `Mode()` for `SizingTarget` or `
 | `Config.Mode()` / `Target()` / `Explicit()` | Inspect sizing mode and inputs |
 | `Config.Bounds()` / `SizingBounds.Resolved()` | Read or resolve target sizing limits |
 | `WithHash(strategy)` / `WithSeed(seed)` / `WithHashConfig(h)` | Set hash family, seed, or full hash config at construction |
-| `Config.WithSeed` / `WithMinBits` / `WithMaxHashCount` / `WithCounterWidth` / `WithHashConfig` | Immutable copy updates after construction |
-| `WithMinBits(m)` / `WithMaxHashCount(k)` | Bound derived sizing on target configs |
+| `Config.WithSeed` / `WithSizingBounds` / `WithMinBits` / `WithMaxHashCount` / `WithCounterWidth` / `WithHashConfig` | Immutable copy updates after construction |
+| `WithSizingBounds(b)` / `WithMinBits(m)` / `WithMaxHashCount(k)` | Bound derived sizing on target configs |
 | `WithCounterWidth(8\|16)` | Select counter width for counting filters |
 | `HashConfig` | Hash-only settings (`Strategy`, `Seed`); embedded in `Config.Hash` |
 | `TheoryFalsePositiveRate(n, m, k)` | Theoretical FPR after `n` inserts |

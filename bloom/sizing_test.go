@@ -69,6 +69,33 @@ func TestSizingBoundsResolved(t *testing.T) {
 	}
 }
 
+func TestWithSizingBounds(t *testing.T) {
+	bounds := SizingBounds{MinBits: 256, MaxHashCount: 8}
+	cfg := TargetConfig(100_000, 0.001, WithSizingBounds(bounds))
+	if cfg.Bounds() != bounds {
+		t.Fatalf("Bounds() = %+v, want %+v", cfg.Bounds(), bounds)
+	}
+	m, k, err := cfg.Size()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m < 256 {
+		t.Errorf("m = %d, want >= 256", m)
+	}
+	if k > 8 {
+		t.Errorf("k = %d, want <= 8", k)
+	}
+
+	base := TargetConfig(1000, 0.01)
+	updated := base.WithSizingBounds(bounds)
+	if base.MinBits != 0 || base.MaxHashCount != 0 {
+		t.Fatalf("WithSizingBounds mutated base: minBits=%d maxK=%d", base.MinBits, base.MaxHashCount)
+	}
+	if updated.Bounds() != bounds {
+		t.Fatalf("updated Bounds() = %+v, want %+v", updated.Bounds(), bounds)
+	}
+}
+
 func TestConfigImmutableUpdaters(t *testing.T) {
 	base := TargetConfig(1000, 0.01)
 	updated := base.

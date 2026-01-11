@@ -64,11 +64,11 @@ func (f *Flags) ConfigOptions() ([]bloom.ConfigOption, error) {
 	if *f.Seed != 0 {
 		opts = append(opts, bloom.WithSeed(*f.Seed))
 	}
-	if *f.MinBits != 0 {
-		opts = append(opts, bloom.WithMinBits(*f.MinBits))
-	}
-	if *f.MaxHashCount != 0 {
-		opts = append(opts, bloom.WithMaxHashCount(uint(*f.MaxHashCount)))
+	if *f.MinBits != 0 || *f.MaxHashCount != 0 {
+		opts = append(opts, bloom.WithSizingBounds(bloom.SizingBounds{
+			MinBits:      *f.MinBits,
+			MaxHashCount: uint(*f.MaxHashCount),
+		}))
 	}
 	if f.CounterWidth != nil {
 		switch *f.CounterWidth {
