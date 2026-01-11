@@ -54,13 +54,29 @@ func NewCountingFromTarget(expectedCapacity uint64, falsePositiveRate float64) (
 // CounterWidth returns the per-bit counter width in bits (8 or 16).
 func (cf *CountingFilter) CounterWidth() uint8 { return cf.width }
 
+const (
+	counterMax8  = uint8(255)
+	counterMax16 = uint16(65535)
+)
+
 // CounterLimit returns the maximum value a single counter can hold before Add
 // returns ErrCounterOverflow (255 for 8-bit counters, 65535 for 16-bit).
 func (cf *CountingFilter) CounterLimit() uint64 {
 	if cf.width == 16 {
-		return 65535
+		return uint64(counterMax16)
 	}
-	return 255
+	return uint64(counterMax8)
+}
+
+// CounterHeadroom returns how many more increments the fullest counter can
+// accept before Add returns ErrCounterOverflow.
+func (cf *CountingFilter) CounterHeadroom() uint64 {
+	max := cf.MaxCounter()
+	limit := cf.CounterLimit()
+	if max >= limit {
+		return 0
+	}
+	return limit - max
 }
 
 // Add increments counters for key.
@@ -200,13 +216,13 @@ func (cf *CountingFilter) counterAt(idx uint64) uint64 {
 
 func (cf *CountingFilter) incCounter(idx uint64) error {
 	if cf.width == 16 {
-		if cf.counters16[idx] == 65535 {
+		if cf.counters16[idx] == counterMax16 {
 			return ErrCounterOverflow
 		}
 		cf.counters16[idx]++
 		return nil
 	}
-	if cf.counters8[idx] == 255 {
+	if cf.counters8[idx] == counterMax8 {
 		return ErrCounterOverflow
 	}
 	cf.counters8[idx]++

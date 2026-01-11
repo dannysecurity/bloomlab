@@ -64,6 +64,38 @@ func TestCountingFilterOverflow(t *testing.T) {
 	}
 }
 
+func TestCountingFilterCounterHeadroom(t *testing.T) {
+	cf, err := NewCounting(64, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cf.CounterHeadroom(); got != 255 {
+		t.Fatalf("empty filter CounterHeadroom() = %d, want 255", got)
+	}
+
+	key := []byte("dup")
+	for range 3 {
+		if err := cf.Add(key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := cf.CounterHeadroom(); got != 252 {
+		t.Fatalf("after three adds CounterHeadroom() = %d, want 252", got)
+	}
+
+	for i := 0; i < 252; i++ {
+		if err := cf.Add(key); err != nil {
+			t.Fatalf("add %d: %v", i, err)
+		}
+	}
+	if got := cf.CounterHeadroom(); got != 0 {
+		t.Fatalf("at saturation CounterHeadroom() = %d, want 0", got)
+	}
+	if err := cf.Add(key); err != ErrCounterOverflow {
+		t.Errorf("expected ErrCounterOverflow, got %v", err)
+	}
+}
+
 func TestCountingFilterCounterLimit(t *testing.T) {
 	narrow, err := NewCounting(64, 2)
 	if err != nil {
