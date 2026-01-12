@@ -16,6 +16,8 @@ type TuneOptions struct {
 	K uint
 	// Samples is how many synthetic keys to probe.
 	Samples int
+	// Distribution names the key shape used for probing (informational).
+	Distribution KeyDistribution
 	// KeyFor maps sample indices to representative keys for the workload.
 	KeyFor func(i int) []byte
 	// PreferSpeed picks the fastest Derive among strategies within ChiMargin of
@@ -92,6 +94,12 @@ func CompareSeeds(strategy Strategy, opts TuneOptions, seeds []uint64) []SeedCan
 
 // TuneOptionsFromConfig builds spread-measurement options from a resolved filter config.
 func TuneOptionsFromConfig(cfg Config, samples int, keyPrefix string) (TuneOptions, error) {
+	return TuneOptionsFromConfigWithDist(cfg, samples, keyPrefix, KeySequential, nil)
+}
+
+// TuneOptionsFromConfigWithDist builds spread-measurement options with a key distribution.
+// When dist is KeyFromSamples, sampleKeys must be non-empty.
+func TuneOptionsFromConfigWithDist(cfg Config, samples int, keyPrefix string, dist KeyDistribution, sampleKeys [][]byte) (TuneOptions, error) {
 	m, k, err := cfg.Size()
 	if err != nil {
 		return TuneOptions{}, err
@@ -102,20 +110,35 @@ func TuneOptionsFromConfig(cfg Config, samples int, keyPrefix string) (TuneOptio
 	if keyPrefix == "" {
 		keyPrefix = "tune"
 	}
-	prefix := keyPrefix
+
+	var keyFor func(i int) []byte
+	switch dist {
+	case KeyFromSamples:
+		if len(sampleKeys) == 0 {
+			return TuneOptions{}, fmt.Errorf("bloom: samples distribution requires non-empty sample keys")
+		}
+		keyFor = KeyForSamples(sampleKeys)
+	default:
+		keyFor = KeyForDistribution(dist, keyPrefix)
+	}
+
 	return TuneOptions{
-		M:       m,
-		K:       k,
-		Samples: samples,
-		KeyFor: func(i int) []byte {
-			return []byte(fmt.Sprintf("%s-%d", prefix, i))
-		},
+		M:            m,
+		K:            k,
+		Samples:      samples,
+		Distribution: dist,
+		KeyFor:       keyFor,
 	}, nil
 }
 
 // RecommendHasherFromConfig is a convenience wrapper around RecommendHasher.
 func RecommendHasherFromConfig(cfg Config, samples int, keyPrefix string, strategies []Strategy, seeds []uint64) (TuningReport, error) {
-	opts, err := TuneOptionsFromConfig(cfg, samples, keyPrefix)
+	return RecommendHasherFromConfigWithDist(cfg, samples, keyPrefix, KeySequential, nil, strategies, seeds)
+}
+
+// RecommendHasherFromConfigWithDist tunes hash settings against a specific key distribution.
+func RecommendHasherFromConfigWithDist(cfg Config, samples int, keyPrefix string, dist KeyDistribution, sampleKeys [][]byte, strategies []Strategy, seeds []uint64) (TuningReport, error) {
+	opts, err := TuneOptionsFromConfigWithDist(cfg, samples, keyPrefix, dist, sampleKeys)
 	if err != nil {
 		return TuningReport{}, err
 	}
@@ -169,7 +192,12 @@ func parseSeedValue(raw string) (uint64, error) {
 func FormatTuningReport(report TuningReport) string {
 	opts := report.Options
 	var b strings.Builder
-	fmt.Fprintf(&b, "Hash tuning for m=%d k=%d (%d probe keys)\n\n", opts.M, opts.K, opts.Samples)
+	fmt.Fprintf(&b, "Hash tuning for m=%d k=%d (%d probe keys", opts.M, opts.K, opts.Samples)
+	if opts.Distribution != KeySequential && opts.Distribution != 0 {
+		fmt.Fprintf(&b, ", key-dist=%s", opts.Distribution)
+	}
+	fmt.Fprintln(&b, ")")
+	fmt.Fprintln(&b)
 
 	if len(report.Strategies) > 0 {
 		header := "Strategy comparison (lower chi² is more uniform):"
@@ -210,7 +238,11 @@ func FormatTuningReportMarkdown(report TuningReport) string {
 	opts := report.Options
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Hash tuning\n\n")
-	fmt.Fprintf(&b, "Layout `m=%d`, `k=%d`, `%d` probe keys.\n\n", opts.M, opts.K, opts.Samples)
+	fmt.Fprintf(&b, "Layout `m=%d`, `k=%d`, `%d` probe keys", opts.M, opts.K, opts.Samples)
+	if opts.Distribution != KeySequential && opts.Distribution != 0 {
+		fmt.Fprintf(&b, ", key-dist `%s`", opts.Distribution)
+	}
+	fmt.Fprint(&b, ".\n\n")
 
 	if len(report.Strategies) > 0 {
 		fmt.Fprintln(&b, "| Strategy | Seed | Chi² | Overlap % | ns/op | Min | Max | Empty |")

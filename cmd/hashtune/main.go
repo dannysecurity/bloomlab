@@ -13,6 +13,8 @@ func main() {
 	filter := filterflags.Register(10_000)
 	samples := flag.Int("samples", 10_000, "synthetic keys to probe for spread measurement")
 	keyPrefix := flag.String("key-prefix", "hashtune", "prefix for synthetic probe keys")
+	keyDist := flag.String("key-dist", "sequential", "probe key shape: sequential, url, uuid, fixed32, or samples")
+	keyFile := flag.String("key-file", "", "read probe keys from file (one per line; implies -key-dist samples)")
 	seedsRaw := flag.String("seeds", "", "comma-separated candidate seeds (default: built-in ladder)")
 	hashValues := flag.String("hash-values", "", "comma-separated hash strategies (default: all)")
 	strategyOnly := flag.String("strategy", "", "tune seeds for one strategy only (skip cross-strategy comparison)")
@@ -27,7 +29,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	opts, err := bloom.TuneOptionsFromConfig(bloomCfg, *samples, *keyPrefix)
+	dist, err := bloom.ParseKeyDistribution(*keyDist)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "hashtune: %v\n", err)
+		os.Exit(1)
+	}
+
+	var sampleKeys [][]byte
+	if *keyFile != "" {
+		sampleKeys, err = bloom.LoadKeyFile(*keyFile, *samples)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "hashtune: %v\n", err)
+			os.Exit(1)
+		}
+		dist = bloom.KeyFromSamples
+	}
+
+	opts, err := bloom.TuneOptionsFromConfigWithDist(bloomCfg, *samples, *keyPrefix, dist, sampleKeys)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "hashtune: %v\n", err)
 		os.Exit(1)
@@ -73,11 +91,7 @@ func main() {
 		}
 	}
 
-	report, err := bloom.RecommendHasherFromConfig(bloomCfg, *samples, *keyPrefix, strategies, seeds)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "hashtune: %v\n", err)
-		os.Exit(1)
-	}
+	report := bloom.RecommendHasher(opts, strategies, seeds)
 	printReport(report, *markdown)
 }
 

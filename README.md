@@ -9,7 +9,7 @@ A Go toolkit for [Bloom filters](https://en.wikipedia.org/wiki/Bloom_filter): sp
 - **Benchmarks** — add, lookup, and remove throughput
 - **benchcompare** — programmatic Bloom filter vs `map[string]struct{}` comparison with CLI and Go benchmarks
 - **dedup** — check-then-insert stream dedup over standard or counting Bloom filters
-- **Demo CLIs** — `bloomdemo`, `countingdemo`, `streamdedup`, `countingdedup`, `urldedup`, `countingurldedup`, `fprcalc`, and `benchcompare` for interactive exploration
+- **Demo CLIs** — `bloomdemo`, `countingdemo`, `streamdedup`, `countingdedup`, `urldedup`, `countingurldedup`, `fprcalc`, `hashtune`, and `benchcompare` for interactive exploration
 
 ## Install
 
@@ -406,10 +406,18 @@ Tune seeds and pick a strategy for a planned layout:
 ```go
 opts := bloom.TuneOptions{
 	M: m, K: k, Samples: 10_000,
-	KeyFor: func(i int) []byte { return []byte(fmt.Sprintf("key-%d", i)) },
+	KeyFor: bloom.KeyForDistribution(bloom.KeyURL, "probe"),
 }
 report := bloom.RecommendHasher(opts, bloom.AllStrategies(), bloom.DefaultTuneSeeds())
 fmt.Println(report.Best.Strategy, report.Best.Seed, report.Best.Spread.ChiSquared)
+```
+
+The `hashtune` CLI compares strategies and seeds for a target layout. Use `-key-dist` to probe keys that resemble your workload (URLs, UUIDs, fixed-width binary IDs), or `-key-file` to read sample keys from a text file:
+
+```bash
+go run ./cmd/hashtune -n 50000 -p 0.01 -key-dist url
+go run ./cmd/hashtune -n 10000 -key-file sample-urls.txt -samples 5000
+go run ./cmd/hashtune -strategy murmur3 -key-dist uuid -seeds 0,42,0xdeadbeef
 ```
 
 When `m` is a power of two, indexing uses a bitmask fast path instead of modulo. Changing strategy or seed changes bit positions — filters are not interoperable across hash settings.
