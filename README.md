@@ -9,7 +9,7 @@ A Go toolkit for [Bloom filters](https://en.wikipedia.org/wiki/Bloom_filter): sp
 - **Benchmarks** — add, lookup, and remove throughput
 - **benchcompare** — programmatic Bloom filter vs `map[string]struct{}` comparison with CLI and Go benchmarks
 - **dedup** — check-then-insert stream dedup over standard or counting Bloom filters
-- **Demo CLIs** — `bloomdemo`, `countingdemo`, `streamdedup`, `countingdedup`, `urldedup`, `fprcalc`, and `benchcompare` for interactive exploration
+- **Demo CLIs** — `bloomdemo`, `countingdemo`, `streamdedup`, `countingdedup`, `urldedup`, `countingurldedup`, `fprcalc`, and `benchcompare` for interactive exploration
 
 ## Install
 
@@ -229,7 +229,17 @@ printf '%s\n' 'https://a.test/x?a=1' 'https://a.test/x?b=2' | go run ./cmd/urlde
 printf '%s\n' 'https://a.test/p?utm_source=x&id=1' 'https://a.test/p?fbclid=y&id=1' | go run ./cmd/urldedup -normalize -strip-tracking
 printf '%s\n' 'https://a.test/one' 'https://a.test/two' | go run ./cmd/urldedup -normalize -domain-only
 
+# Counting URL stream deduper — canonicalize URLs and allow removable keys (prefix lines with -)
+printf '%s\n' \
+  'https://a.test/page?utm_source=x' \
+  'https://a.test/page?fbclid=y' \
+  '-https://a.test/page' \
+  'https://a.test/page' \
+  | go run ./cmd/countingurldedup -normalize -strip-tracking
+printf '%s\n' 'https://a.test/path/' 'https://a.test/path' '-https://a.test/path' 'https://a.test/path' | go run ./cmd/countingurldedup -normalize
+
 # Sizing calculator — show m, k, fill fraction, and theory FPR for a target
+go run ./cmd/fprcalc -n 10000 -p 0.01
 go run ./cmd/fprcalc -n 10000 -p 0.01
 go run ./cmd/fprcalc -n 10000 -p 0.01 -derive   # step-by-step FPR math
 go run ./cmd/fprcalc -n 5000 -p 0.001 -at 7500

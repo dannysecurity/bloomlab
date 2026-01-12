@@ -14,7 +14,7 @@ type Flags struct {
 	JSON       *bool
 }
 
-// Register binds stream output flags shared by streamdedup, countingdedup, and urldedup.
+// Register binds stream output flags shared by stream dedup CLIs.
 func Register() *Flags {
 	return &Flags{
 		Quiet:      flag.Bool("quiet", false, "print summary only"),
