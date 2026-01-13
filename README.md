@@ -77,6 +77,12 @@ Use 16-bit counters when duplicate inserts may exceed 255 per probed position:
 cf, _ := bloom.NewCountingFilter(bloom.ExplicitConfig(1024, 4, bloom.WithCounterWidth(16)))
 ```
 
+Use 32-bit counters for workloads with very high per-position reference counts:
+
+```go
+cf, _ := bloom.NewCountingFilter(bloom.ExplicitConfig(1024, 4, bloom.WithCounterWidth(32)))
+```
+
 ## False positive rate
 
 A Bloom filter may report **maybe present** for keys that were never inserted. That **false positive rate (FPR)** is the probability `TargetConfig(n, p)` sizes for.
@@ -334,7 +340,7 @@ go test -bench=ReportMetrics ./benchcompare/
 | Type | Add | Contains | Remove | Notes |
 |------|-----|----------|--------|-------|
 | `Filter` | ✓ | ✓ | — | Classic bit-slice Bloom filter |
-| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters by default; `WithCounterWidth(16)` for wider variant; overflow at counter max; `Clear`, `CounterBytes`, `CounterWidth`, `ApproximateCount`, `TheoryFPR`, `FillRatio` |
+| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters by default; `WithCounterWidth(16\|32)` for wider variants; overflow at counter max; `Clear`, `CounterBytes`, `CounterWidth`, `ApproximateCount`, `TheoryFPR`, `FillRatio` |
 
 ### Configuration
 
@@ -349,7 +355,7 @@ Sizing mode is explicit on `bloom.Config`: call `Mode()` for `SizingTarget` or `
 | `WithHash(strategy)` / `WithSeed(seed)` / `WithHashConfig(h)` | Set hash family, seed, or full hash config at construction |
 | `Config.WithSeed` / `WithSizingBounds` / `WithMinBits` / `WithMaxHashCount` / `WithCounterWidth` / `WithHashConfig` | Immutable copy updates after construction |
 | `WithSizingBounds(b)` / `WithMinBits(m)` / `WithMaxHashCount(k)` | Bound derived sizing on target configs |
-| `WithCounterWidth(8\|16)` | Select counter width for counting filters |
+| `WithCounterWidth(8\|16\|32)` | Select counter width for counting filters |
 | `HashConfig` | Hash-only settings (`Strategy`, `Seed`); embedded in `Config.Hash` |
 | `TheoryFalsePositiveRate(n, m, k)` | Theoretical FPR after `n` inserts |
 | `TheoryFillFraction(n, m, k)` | Expected fraction of bits set after `n` inserts |

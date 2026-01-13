@@ -37,7 +37,7 @@ func Register(defaultCapacity uint64) *Flags {
 // RegisterCounting binds the standard flags plus -counter-width for counting filters.
 func RegisterCounting(defaultCapacity uint64) *Flags {
 	f := Register(defaultCapacity)
-	f.CounterWidth = flag.Uint("counter-width", 8, "per-bit counter width in bits: 8 or 16")
+	f.CounterWidth = flag.Uint("counter-width", 8, "per-bit counter width in bits: 8, 16, or 32")
 	return f
 }
 
@@ -73,10 +73,10 @@ func (f *Flags) ConfigOptions() ([]bloom.ConfigOption, error) {
 	if f.CounterWidth != nil {
 		switch *f.CounterWidth {
 		case 8:
-		case 16:
-			opts = append(opts, bloom.WithCounterWidth(16))
+		case 16, 32:
+			opts = append(opts, bloom.WithCounterWidth(uint8(*f.CounterWidth)))
 		default:
-			return nil, fmt.Errorf("counter-width must be 8 or 16")
+			return nil, fmt.Errorf("counter-width must be 8, 16, or 32")
 		}
 	}
 	return opts, nil

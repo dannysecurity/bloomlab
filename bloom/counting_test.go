@@ -166,8 +166,43 @@ func TestCountingFilterWideCounterOverflow(t *testing.T) {
 	}
 }
 
+func TestCountingFilterExtraWideCounterWidth(t *testing.T) {
+	cf, err := NewCountingFilter(ExplicitConfig(8, 1, WithCounterWidth(32)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cf.CounterWidth() != 32 {
+		t.Fatalf("CounterWidth() = %d, want 32", cf.CounterWidth())
+	}
+	if got := cf.CounterBytes(); got != 32 {
+		t.Fatalf("CounterBytes() = %d, want 32", got)
+	}
+	if got := cf.CounterLimit(); got != 4294967295 {
+		t.Fatalf("CounterLimit() = %d, want 4294967295", got)
+	}
+
+	key := []byte("x")
+	for i := 0; i < 512; i++ {
+		if err := cf.Add(key); err != nil {
+			t.Fatalf("add %d: %v", i, err)
+		}
+	}
+	if got := cf.MaxCounter(); got != 512 {
+		t.Fatalf("MaxCounter() = %d, want 512", got)
+	}
+	if !cf.Contains(key) {
+		t.Fatal("expected key after 512 wide adds")
+	}
+	if !cf.Remove(key) {
+		t.Fatal("remove should succeed")
+	}
+	if !cf.Contains(key) {
+		t.Fatal("key should still appear present after one of 512 adds removed")
+	}
+}
+
 func TestCountingFilterInvalidCounterWidth(t *testing.T) {
-	_, err := NewCountingFilter(ExplicitConfig(64, 2, WithCounterWidth(32)))
+	_, err := NewCountingFilter(ExplicitConfig(64, 2, WithCounterWidth(24)))
 	if err != ErrInvalidCounterWidth {
 		t.Errorf("error = %v, want %v", err, ErrInvalidCounterWidth)
 	}

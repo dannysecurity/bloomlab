@@ -10,7 +10,7 @@ var (
 	ErrInvalidCapacity    = errors.New("bloom: capacity must be positive")
 	ErrInvalidFPR         = errors.New("bloom: false positive rate must be in (0, 1)")
 	ErrInvalidBits        = errors.New("bloom: bit count must be positive")
-	ErrInvalidCounterWidth = errors.New("bloom: counter width must be 8 or 16")
+	ErrInvalidCounterWidth = errors.New("bloom: counter width must be 8, 16, or 32")
 )
 
 const (
@@ -89,7 +89,7 @@ func WithSizingBounds(bounds SizingBounds) ConfigOption {
 }
 
 // WithCounterWidth selects per-bit counter width for counting filters.
-// Supported values are 8 (default) and 16. Wider counters use more memory
+// Supported values are 8 (default), 16, and 32. Wider counters use more memory
 // but tolerate more duplicate inserts before ErrCounterOverflow.
 func WithCounterWidth(width uint8) ConfigOption {
 	return func(c *Config) {
@@ -117,7 +117,7 @@ type Config struct {
 	MinBits      uint64
 	MaxHashCount uint
 
-	// CounterWidth selects uint8 (0 or 8) or uint16 (16) counters for counting filters.
+	// CounterWidth selects uint8 (0 or 8), uint16 (16), or uint32 (32) counters for counting filters.
 	CounterWidth uint8
 
 	Hash HashConfig
@@ -205,7 +205,7 @@ func (c Config) WithSizingBounds(bounds SizingBounds) Config {
 	return c
 }
 
-// WithCounterWidth returns a copy with the given per-bit counter width (8 or 16).
+// WithCounterWidth returns a copy with the given per-bit counter width (8, 16, or 32).
 func (c Config) WithCounterWidth(width uint8) Config {
 	c.CounterWidth = width
 	return c
@@ -268,10 +268,11 @@ func (c Config) String() string {
 }
 
 func (c Config) counterWidthSuffix() string {
-	if c.resolvedCounterWidth() == 16 {
-		return " counter-width=16"
+	width := c.resolvedCounterWidth()
+	if width == 8 {
+		return ""
 	}
-	return ""
+	return fmt.Sprintf(" counter-width=%d", width)
 }
 
 func applyOptions(cfg *Config, opts []ConfigOption) {
@@ -289,7 +290,7 @@ func (c Config) resolvedCounterWidth() uint8 {
 
 func (c Config) validateCounterWidth() error {
 	switch c.resolvedCounterWidth() {
-	case 8, 16:
+	case 8, 16, 32:
 		return nil
 	default:
 		return ErrInvalidCounterWidth
