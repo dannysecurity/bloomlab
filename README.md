@@ -385,9 +385,9 @@ Bit positions use **double hashing**: `h(i) = (h1 + i·h2) mod m`. Hash settings
 | Strategy | Name | Notes |
 |----------|------|-------|
 | `HashFNV` | `fnv` | Default; FNV-1a 64-bit (backward compatible; seed ignored) |
-| `HashMurmur3` | `murmur3` | MurmurHash3 64-bit with independent seeds for `h1`/`h2` |
-| `HashXXHash` | `xxhash` | xxHash 64-bit with independent seeds for `h1`/`h2` |
-| `HashWyhash` | `wyhash` | wyhash final v1 64-bit with independent seeds for `h1`/`h2` |
+| `HashMurmur3` | `murmur3` | MurmurHash3 x64_128 single-pass derivation |
+| `HashXXHash` | `xxhash` | Single-pass xxHash-128-style derivation |
+| `HashWyhash` | `wyhash` | wyhash single-pass paired-state derivation |
 | `HashHighway` | `highway` | HighwayHash-128 single-pass derivation (seed-sensitive; keyed PRF) |
 
 ```go
@@ -416,6 +416,25 @@ opts := bloom.TuneOptions{
 }
 report := bloom.RecommendHasher(opts, bloom.AllStrategies(), bloom.DefaultTuneSeeds())
 fmt.Println(report.Best.Strategy, report.Best.Seed, report.Best.Spread.ChiSquared)
+```
+
+Tuning reports also include **double-hash stride** (`gcd(h2, m)` defects) and **h1/h2 correlation** (`|r|` near zero is better). Apply the recommendation at construction time:
+
+```go
+cfg, err := bloom.TargetConfig(10_000, 0.01).WithRecommendedHash(bloom.RecommendedHashOptions{
+	Samples:      5000,
+	Distribution: bloom.KeyURL,
+	KeyPrefix:    "probe",
+})
+f, _ := bloom.NewFilter(cfg)
+```
+
+Or as a config option (panics if tuning inputs are invalid):
+
+```go
+cfg := bloom.TargetConfig(10_000, 0.01, bloom.WithRecommendedHash(bloom.RecommendedHashOptions{
+	Samples: 5000,
+}))
 ```
 
 The `hashtune` CLI compares strategies and seeds for a target layout. Use `-key-dist` to probe keys that resemble your workload (URLs, UUIDs, fixed-width binary IDs), or `-key-file` to read sample keys from a text file:

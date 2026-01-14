@@ -65,6 +65,19 @@ func WithHashConfig(hash HashConfig) ConfigOption {
 	}
 }
 
+// WithRecommendedHash tunes hash strategy and seed against the config layout and
+// applies the best pick. Tuning uses bucket spread, probe overlap, stride health,
+// and h1/h2 correlation; see RecommendHasher for scoring details.
+func WithRecommendedHash(rec RecommendedHashOptions) ConfigOption {
+	return func(c *Config) {
+		tuned, err := c.WithRecommendedHash(rec)
+		if err != nil {
+			panic(fmt.Errorf("bloom: WithRecommendedHash: %w", err))
+		}
+		*c = tuned
+	}
+}
+
 // WithMinBits sets the minimum bit count for target-based sizing.
 func WithMinBits(minBits uint64) ConfigOption {
 	return func(c *Config) {
@@ -184,6 +197,43 @@ func (c Config) WithSeed(seed uint64) Config {
 func (c Config) WithHashConfig(hash HashConfig) Config {
 	c.Hash = hash
 	return c
+}
+
+// WithRecommendedHash returns a copy whose hash settings were chosen by running
+// RecommendHasher against this config's resolved layout (m, k).
+func (c Config) WithRecommendedHash(rec RecommendedHashOptions) (Config, error) {
+	samples := rec.Samples
+	if samples <= 0 {
+		samples = 5000
+	}
+	dist := rec.Distribution
+	if dist == 0 {
+		dist = KeySequential
+	}
+	prefix := rec.KeyPrefix
+	if prefix == "" {
+		prefix = "key"
+	}
+
+	opts, err := TuneOptionsFromConfigWithDist(c, samples, prefix, dist, rec.SampleKeys)
+	if err != nil {
+		return Config{}, err
+	}
+	opts.PreferSpeed = rec.PreferSpeed
+	opts.ChiMargin = rec.ChiMargin
+
+	strategies := rec.Strategies
+	if len(strategies) == 0 {
+		strategies = AllStrategies()
+	}
+	seeds := rec.Seeds
+	if len(seeds) == 0 {
+		seeds = DefaultTuneSeeds()
+	}
+
+	report := RecommendHasher(opts, strategies, seeds)
+	c.Hash = report.BestHashConfig()
+	return c, nil
 }
 
 // WithMinBits returns a copy with an updated minimum bit count for target sizing.

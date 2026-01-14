@@ -101,9 +101,9 @@ func TestMurmur3GoldenVectors(t *testing.T) {
 		h1   uint64
 		h2   uint64
 	}{
-		{"", 0, 0x0, 0x9ca066f1a4ab2eea},
-		{"alpha", 0, 0xff80f427ed2eda4c, 0xfc3ebfc92760afa2},
-		{"alpha", 42, 0x3424b7db13f4e2c7, 0xe7c89d9881b502d7},
+		{"", 0, 0x0, 0x1},
+		{"alpha", 0, 0xffe53dd0983e1695, 0xd9bb04982603e41e},
+		{"alpha", 42, 0xd10dbe75208d96f9, 0xd22261ef4c7cd250},
 	}
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {
@@ -137,8 +137,8 @@ func TestXXHashGoldenVectors(t *testing.T) {
 		h2   uint64
 	}{
 		{"", 0, 0xef46db3751d8e999, 0xc4349fc93c010000},
-		{"alpha", 0, 0xc758e1011dda5848, 0x7a08af8b42bd9cae},
-		{"alpha", 42, 0x41f206d893836e6b, 0xd7116ca205131a8},
+		{"alpha", 0, 0xc758e1011dda5848, 0x7b65251ba528d50b},
+		{"alpha", 42, 0x41f206d893836e6b, 0xd61f1732b38a81d6},
 	}
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {

@@ -11,11 +11,11 @@ type Strategy int
 const (
 	// HashFNV uses FNV-1a 64-bit with a second pass over key‖0x00 (default).
 	HashFNV Strategy = iota
-	// HashMurmur3 uses MurmurHash3 64-bit with independent seeds for h1 and h2.
+	// HashMurmur3 uses MurmurHash3 x64_128 in a single pass for h1 and h2.
 	HashMurmur3
-	// HashXXHash uses xxHash 64-bit with independent seeds for h1 and h2.
+	// HashXXHash uses a single-pass xxHash-128-style derivation for h1 and h2.
 	HashXXHash
-	// HashWyhash uses wyhash final v1 64-bit with independent seeds for h1 and h2.
+	// HashWyhash uses wyhash in a single pass with paired state for h1 and h2.
 	HashWyhash
 	// HashHighway uses HighwayHash-128 in a single pass for h1 and h2 (seed-sensitive).
 	HashHighway

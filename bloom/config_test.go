@@ -265,3 +265,26 @@ func TestConfigMatchesLegacyConstructors(t *testing.T) {
 		t.Errorf("counting legacy vs config mismatch")
 	}
 }
+
+func TestConfigWithRecommendedHash(t *testing.T) {
+	cfg := TargetConfig(2000, 0.01)
+	tuned, err := cfg.WithRecommendedHash(RecommendedHashOptions{
+		Samples: 1000,
+		Strategies: []Strategy{HashMurmur3, HashXXHash, HashWyhash},
+		Seeds:   []uint64{0, 7},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tuned.Hash.Strategy == 0 && tuned.Hash.Seed == 0 {
+		t.Fatal("expected non-default recommended hash")
+	}
+	f, err := NewFilter(tuned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Add([]byte("recommended"))
+	if !f.Contains([]byte("recommended")) {
+		t.Fatal("recommended-hash filter should contain inserted key")
+	}
+}
