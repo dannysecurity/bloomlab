@@ -346,14 +346,31 @@ go test -bench=ReportMetrics ./benchcompare/
 
 Sizing mode is explicit on `bloom.Config`: call `Mode()` for `SizingTarget` or `SizingExplicit`, or use `Target()` / `Explicit()` to read the typed inputs. `Bounds()` returns target-mode limits (`SizingBounds` with package defaults via `Resolved()`).
 
+Prefer typed specs when assembling configuration from structured inputs (CLI flags, config files, or tests):
+
+```go
+cfg, err := bloom.BuildConfig(bloom.SizingTarget, bloom.TargetSpec{
+	Capacity: 10_000,
+	FPR:      0.01,
+	Bounds:   bloom.SizingBounds{MinBits: 256},
+}, bloom.ExplicitSpec{},
+	bloom.WithHash(bloom.HashMurmur3),
+)
+```
+
+`ConfigFromTarget` and `ConfigFromExplicit` skip validation; use `BuildConfig` or call `Validate()` before constructing filters.
+
 | Helper | Use when |
 |--------|----------|
 | `TargetConfig(n, p, opts...)` | Derive `m` and `k` from expected capacity and FPR |
 | `ExplicitConfig(m, k, opts...)` | Fix bit count and hash functions directly |
+| `ConfigFromTarget(spec, opts...)` / `ConfigFromExplicit(spec, opts...)` | Build from typed `TargetSpec` / `ExplicitSpec` |
+| `BuildConfig(mode, target, explicit, opts...)` | Validate typed specs and return a ready `Config` |
+| `Config.Apply(opts...)` | Apply construction options to an existing config copy |
 | `Config.Mode()` / `Target()` / `Explicit()` | Inspect sizing mode and inputs |
 | `Config.Bounds()` / `SizingBounds.Resolved()` | Read or resolve target sizing limits |
 | `WithHash(strategy)` / `WithSeed(seed)` / `WithHashConfig(h)` | Set hash family, seed, or full hash config at construction |
-| `Config.WithSeed` / `WithSizingBounds` / `WithMinBits` / `WithMaxHashCount` / `WithCounterWidth` / `WithHashConfig` | Immutable copy updates after construction |
+| `Config.WithSeed` / `WithHash` / `WithSizingBounds` / `WithMinBits` / `WithMaxHashCount` / `WithCounterWidth` / `WithHashConfig` | Immutable copy updates after construction |
 | `WithSizingBounds(b)` / `WithMinBits(m)` / `WithMaxHashCount(k)` | Bound derived sizing on target configs |
 | `WithCounterWidth(8\|16\|32)` | Select counter width for counting filters |
 | `HashConfig` | Hash-only settings (`Strategy`, `Seed`); embedded in `Config.Hash` |

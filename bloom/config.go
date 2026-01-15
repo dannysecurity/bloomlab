@@ -114,7 +114,9 @@ func WithCounterWidth(width uint8) ConfigOption {
 //   - Target mode: ExpectedCapacity and FalsePositiveRate derive m and k.
 //   - Explicit mode: non-zero Bits (m) and HashCount (k) are used directly.
 //
-// Use TargetConfig or ExplicitConfig to construct a config in the intended mode.
+// Use TargetConfig, ExplicitConfig, or the typed spec helpers ConfigFromTarget /
+// ConfigFromExplicit to construct a config in the intended mode. BuildConfig
+// validates typed specs before returning a Config.
 // Hash settings live in Config.Hash (WithHash, WithSeed, WithHashConfig).
 // Sizing bounds for target mode use WithMinBits and WithMaxHashCount.
 type Config struct {
@@ -139,23 +141,25 @@ type Config struct {
 // TargetConfig returns a Config that derives m and k from expected capacity
 // and false positive rate using the standard Bloom filter formulas.
 func TargetConfig(expectedCapacity uint64, falsePositiveRate float64, opts ...ConfigOption) Config {
-	cfg := Config{
-		ExpectedCapacity:  expectedCapacity,
-		FalsePositiveRate: falsePositiveRate,
-	}
-	applyOptions(&cfg, opts)
-	return cfg
+	return ConfigFromTarget(TargetSpec{
+		Capacity: expectedCapacity,
+		FPR:      falsePositiveRate,
+	}, opts...)
 }
 
 // ExplicitConfig returns a Config with fixed bit count and hash functions.
 // HashCount of zero is treated as one at construction time.
 func ExplicitConfig(bits uint64, hashCount uint, opts ...ConfigOption) Config {
-	cfg := Config{
+	return ConfigFromExplicit(ExplicitSpec{
 		Bits:      bits,
 		HashCount: hashCount,
-	}
-	applyOptions(&cfg, opts)
-	return cfg
+	}, opts...)
+}
+
+// Apply returns a copy of c with the given options applied.
+func (c Config) Apply(opts ...ConfigOption) Config {
+	applyOptions(&c, opts)
+	return c
 }
 
 // isExplicitSizing reports whether m and k come from Bits and HashCount,
@@ -185,6 +189,12 @@ func (c Config) WithFalsePositiveRate(p float64) Config {
 func (c Config) WithHashStrategy(strategy Strategy) Config {
 	c.Hash.Strategy = strategy
 	return c
+}
+
+// WithHash returns a copy using the given hash strategy.
+// It mirrors the WithHash ConfigOption used at construction time.
+func (c Config) WithHash(strategy Strategy) Config {
+	return c.WithHashStrategy(strategy)
 }
 
 // WithSeed returns a copy with an updated hash seed.

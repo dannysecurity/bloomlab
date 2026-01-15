@@ -132,6 +132,11 @@ func TestFlagsConfigTable(t *testing.T) {
 			},
 		},
 		{
+			name:    "hash count without bit count",
+			args:    []string{"-k", "6"},
+			wantErr: "explicit sizing requires -m",
+		},
+		{
 			name:    "invalid hash strategy",
 			args:    []string{"-hash", "sha256"},
 			wantErr: "unknown hash strategy",

@@ -33,10 +33,11 @@ func main() {
 	}
 
 	inserts := *at
-	if inserts == 0 {
-		inserts = bloomCfg.ExpectedCapacity
+	target, hasTarget := bloomCfg.Target()
+	if inserts == 0 && hasTarget {
+		inserts = target.Capacity
 	}
-	if inserts != bloomCfg.ExpectedCapacity {
+	if hasTarget && inserts != target.Capacity {
 		fpr := bloom.TheoryFalsePositiveRate(inserts, plan.Bits, plan.HashCount)
 		fill := bloom.TheoryFillFraction(inserts, plan.Bits, plan.HashCount)
 		fmt.Printf(

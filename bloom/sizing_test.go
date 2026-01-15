@@ -114,4 +114,90 @@ func TestConfigImmutableUpdaters(t *testing.T) {
 	if updated.MinBits != 256 || updated.MaxHashCount != 8 || updated.CounterWidth != 16 {
 		t.Fatalf("bounds/counter = minBits=%d maxK=%d width=%d", updated.MinBits, updated.MaxHashCount, updated.CounterWidth)
 	}
+
+	hashed := base.WithHash(HashXXHash)
+	if hashed.Hash.Strategy != HashXXHash || base.Hash.Strategy != HashFNV {
+		t.Fatalf("WithHash mutated base or wrong strategy: orig=%v updated=%v", base.Hash.Strategy, hashed.Hash.Strategy)
+	}
+}
+
+func TestConfigFromTypedSpecs(t *testing.T) {
+	target := ConfigFromTarget(TargetSpec{
+		Capacity: 5000,
+		FPR:      0.02,
+		Bounds:   SizingBounds{MinBits: 128, MaxHashCount: 10},
+	}, WithHash(HashMurmur3))
+	got, ok := target.Target()
+	if !ok {
+		t.Fatal("Target() = false")
+	}
+	if got.Capacity != 5000 || got.FPR != 0.02 || got.Bounds.MinBits != 128 {
+		t.Fatalf("Target() = %+v", got)
+	}
+	if target.Hash.Strategy != HashMurmur3 {
+		t.Fatalf("Hash = %+v, want murmur3", target.Hash)
+	}
+
+	explicit := ConfigFromExplicit(ExplicitSpec{Bits: 512, HashCount: 6})
+	es, ok := explicit.Explicit()
+	if !ok || es.Bits != 512 || es.HashCount != 6 {
+		t.Fatalf("Explicit() = %+v ok=%v", es, ok)
+	}
+}
+
+func TestBuildConfig(t *testing.T) {
+	cfg, err := BuildConfig(SizingTarget, TargetSpec{Capacity: 1000, FPR: 0.01}, ExplicitSpec{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Mode() != SizingTarget {
+		t.Fatalf("Mode() = %v, want target", cfg.Mode())
+	}
+
+	cfg, err = BuildConfig(SizingExplicit, TargetSpec{}, ExplicitSpec{Bits: 256, HashCount: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Mode() != SizingExplicit {
+		t.Fatalf("Mode() = %v, want explicit", cfg.Mode())
+	}
+
+	if _, err := BuildConfig(SizingTarget, TargetSpec{Capacity: 0, FPR: 0.01}, ExplicitSpec{}); err != ErrInvalidCapacity {
+		t.Fatalf("BuildConfig zero capacity = %v, want ErrInvalidCapacity", err)
+	}
+	if _, err := BuildConfig(SizingExplicit, TargetSpec{}, ExplicitSpec{Bits: 0, HashCount: 4}); err != ErrInvalidBits {
+		t.Fatalf("BuildConfig incomplete explicit = %v, want ErrInvalidBits", err)
+	}
+}
+
+func TestTargetSpecValidate(t *testing.T) {
+	if err := (TargetSpec{Capacity: 100, FPR: 0.01}).Validate(); err != nil {
+		t.Fatalf("valid target Validate() = %v", err)
+	}
+	if err := (TargetSpec{Capacity: 0, FPR: 0.01}).Validate(); err != ErrInvalidCapacity {
+		t.Fatalf("zero capacity Validate() = %v, want ErrInvalidCapacity", err)
+	}
+	if err := (TargetSpec{Capacity: 100, FPR: 0}).Validate(); err != ErrInvalidFPR {
+		t.Fatalf("zero FPR Validate() = %v, want ErrInvalidFPR", err)
+	}
+}
+
+func TestExplicitSpecValidate(t *testing.T) {
+	if err := (ExplicitSpec{Bits: 64, HashCount: 3}).Validate(); err != nil {
+		t.Fatalf("valid explicit Validate() = %v", err)
+	}
+	if err := (ExplicitSpec{Bits: 0, HashCount: 4}).Validate(); err != ErrInvalidBits {
+		t.Fatalf("zero bits Validate() = %v, want ErrInvalidBits", err)
+	}
+}
+
+func TestConfigApply(t *testing.T) {
+	base := TargetConfig(1000, 0.01)
+	updated := base.Apply(WithHash(HashWyhash), WithSeed(17))
+	if base.Hash.Strategy != HashFNV || base.Hash.Seed != 0 {
+		t.Fatalf("Apply mutated base: %+v", base.Hash)
+	}
+	if updated.Hash.Strategy != HashWyhash || updated.Hash.Seed != 17 {
+		t.Fatalf("Apply result = %+v", updated.Hash)
+	}
 }

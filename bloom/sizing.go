@@ -63,10 +63,78 @@ type TargetSpec struct {
 	Bounds   SizingBounds
 }
 
+// Validate checks that target sizing inputs are usable.
+func (s TargetSpec) Validate() error {
+	if s.Capacity == 0 {
+		return ErrInvalidCapacity
+	}
+	if s.FPR <= 0 || s.FPR >= 1 {
+		return ErrInvalidFPR
+	}
+	return nil
+}
+
 // ExplicitSpec holds fixed m and k for explicit sizing.
 type ExplicitSpec struct {
 	Bits      uint64
 	HashCount uint
+}
+
+// Validate checks that explicit sizing inputs are usable.
+func (s ExplicitSpec) Validate() error {
+	if s.Bits == 0 {
+		return ErrInvalidBits
+	}
+	return nil
+}
+
+// ConfigFromTarget builds a Config from typed target sizing inputs.
+// Use BuildConfig when validation before construction is required.
+func ConfigFromTarget(spec TargetSpec, opts ...ConfigOption) Config {
+	cfg := Config{
+		ExpectedCapacity:  spec.Capacity,
+		FalsePositiveRate: spec.FPR,
+		MinBits:           spec.Bounds.MinBits,
+		MaxHashCount:      spec.Bounds.MaxHashCount,
+	}
+	applyOptions(&cfg, opts)
+	return cfg
+}
+
+// ConfigFromExplicit builds a Config from typed explicit sizing inputs.
+// HashCount of zero is treated as one when sizing is resolved.
+func ConfigFromExplicit(spec ExplicitSpec, opts ...ConfigOption) Config {
+	cfg := Config{
+		Bits:      spec.Bits,
+		HashCount: spec.HashCount,
+	}
+	applyOptions(&cfg, opts)
+	return cfg
+}
+
+// BuildConfig constructs and validates a Config from typed sizing specs.
+// For SizingTarget, supply target and leave explicit zero-valued.
+// For SizingExplicit, supply explicit and leave target zero-valued.
+func BuildConfig(mode SizingMode, target TargetSpec, explicit ExplicitSpec, opts ...ConfigOption) (Config, error) {
+	var cfg Config
+	switch mode {
+	case SizingTarget:
+		if err := target.Validate(); err != nil {
+			return Config{}, err
+		}
+		cfg = ConfigFromTarget(target, opts...)
+	case SizingExplicit:
+		if err := explicit.Validate(); err != nil {
+			return Config{}, err
+		}
+		cfg = ConfigFromExplicit(explicit, opts...)
+	default:
+		return Config{}, fmt.Errorf("bloom: unknown sizing mode %v", mode)
+	}
+	if err := cfg.Validate(); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
 }
 
 // Mode reports whether the configuration uses target or explicit sizing.

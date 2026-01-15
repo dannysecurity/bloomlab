@@ -49,9 +49,22 @@ func (f *Flags) Config() (bloom.Config, error) {
 		return bloom.Config{}, err
 	}
 	if *f.Bits != 0 {
-		return bloom.ExplicitConfig(*f.Bits, uint(*f.HashCount), opts...), nil
+		return bloom.BuildConfig(bloom.SizingExplicit, bloom.TargetSpec{}, bloom.ExplicitSpec{
+			Bits:      *f.Bits,
+			HashCount: uint(*f.HashCount),
+		}, opts...)
 	}
-	return bloom.TargetConfig(*f.Capacity, *f.FPR, opts...), nil
+	if *f.HashCount != 0 {
+		return bloom.Config{}, fmt.Errorf("explicit sizing requires -m (bit count); -k without -m is invalid")
+	}
+	return bloom.BuildConfig(bloom.SizingTarget, bloom.TargetSpec{
+		Capacity: *f.Capacity,
+		FPR:      *f.FPR,
+		Bounds: bloom.SizingBounds{
+			MinBits:      *f.MinBits,
+			MaxHashCount: uint(*f.MaxHashCount),
+		},
+	}, bloom.ExplicitSpec{}, opts...)
 }
 
 // ConfigOptions returns bloom.ConfigOption values for hash and sizing bounds.
