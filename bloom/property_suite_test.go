@@ -63,6 +63,71 @@ func TestTheoryFPRDecreasingInMProperty(t *testing.T) {
 	}
 }
 
+func TestTheoryFillFractionRangeProperty(t *testing.T) {
+	prop := func(n, m uint32, k uint8) bool {
+		if m == 0 || k == 0 || n == 0 {
+			return TheoryFillFraction(uint64(n), uint64(m), uint(k)) == 0
+		}
+		fill := TheoryFillFraction(uint64(n), uint64(m), uint(k))
+		return fill >= 0 && fill <= 1
+	}
+	if err := quick.Check(prop, propertyQuick); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestTheoryFillFractionMonotonicInNProperty(t *testing.T) {
+	prop := func(m uint32, k uint8, nLo, nHi uint32) bool {
+		if m == 0 || k == 0 {
+			return true
+		}
+		if nLo > nHi {
+			nLo, nHi = nHi, nLo
+		}
+		fillLo := TheoryFillFraction(uint64(nLo), uint64(m), uint(k))
+		fillHi := TheoryFillFraction(uint64(nHi), uint64(m), uint(k))
+		return fillLo <= fillHi
+	}
+	if err := quick.Check(prop, propertyQuick); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestTheoryFillFractionDecreasingInMProperty(t *testing.T) {
+	prop := func(n uint32, k uint8, mLo, mHi uint32) bool {
+		if n == 0 || k == 0 {
+			return true
+		}
+		if mLo > mHi {
+			mLo, mHi = mHi, mLo
+		}
+		if mLo == 0 {
+			mLo = 1
+		}
+		fillLo := TheoryFillFraction(uint64(n), uint64(mLo), uint(k))
+		fillHi := TheoryFillFraction(uint64(n), uint64(mHi), uint(k))
+		return fillLo >= fillHi
+	}
+	if err := quick.Check(prop, propertyQuick); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestTheoryFPRFromFillProperty(t *testing.T) {
+	prop := func(n, m uint32, k uint8) bool {
+		if m == 0 || k == 0 || n == 0 {
+			return true
+		}
+		fill := TheoryFillFraction(uint64(n), uint64(m), uint(k))
+		fpr := TheoryFalsePositiveRate(uint64(n), uint64(m), uint(k))
+		want := math.Pow(fill, float64(k))
+		return math.Abs(fpr-want) <= 1e-12*math.Max(1, want)
+	}
+	if err := quick.Check(prop, propertyQuick); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestOptimalKNearMinimumFPRProperty(t *testing.T) {
 	prop := func(n uint32, m uint32) bool {
 		if n == 0 || m == 0 || n > 50_000 || m > 200_000 {
