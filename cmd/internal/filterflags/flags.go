@@ -7,6 +7,9 @@ import (
 	"github.com/dannysecurity/bloomlab/bloom"
 )
 
+// DefaultCapacity is the shared default for -n when a CLI does not override it.
+const DefaultCapacity uint64 = 10_000
+
 // Flags holds shared CLI options for Bloom filter demos.
 type Flags struct {
 	Capacity     *uint64
@@ -41,33 +44,88 @@ func RegisterCounting(defaultCapacity uint64) *Flags {
 	return f
 }
 
-// Config builds a bloom.Config from parsed flag values. When -m is set, explicit
-// sizing is used; otherwise target sizing derives m and k from -n and -p.
-func (f *Flags) Config() (bloom.Config, error) {
-	opts, err := f.ConfigOptions()
+// FilterConfig builds a bloom.FilterConfig from parsed flag values. When -m is set,
+// explicit sizing is used; otherwise target sizing derives m and k from -n and -p.
+func (f *Flags) FilterConfig() (bloom.FilterConfig, error) {
+	hash, err := f.hashConfig()
 	if err != nil {
-		return bloom.Config{}, err
+		return bloom.FilterConfig{}, err
 	}
+
 	if *f.Bits != 0 {
-		return bloom.BuildConfig(bloom.SizingExplicit, bloom.TargetSpec{}, bloom.ExplicitSpec{
+		fc, err := bloom.BuildFilterConfig(bloom.SizingExplicit, bloom.TargetSpec{}, bloom.ExplicitSpec{
 			Bits:      *f.Bits,
 			HashCount: uint(*f.HashCount),
-		}, opts...)
+		})
+		if err != nil {
+			return bloom.FilterConfig{}, err
+		}
+		fc.Hash = hash
+		return fc, nil
 	}
 	if *f.HashCount != 0 {
-		return bloom.Config{}, fmt.Errorf("explicit sizing requires -m (bit count); -k without -m is invalid")
+		return bloom.FilterConfig{}, fmt.Errorf("explicit sizing requires -m (bit count); -k without -m is invalid")
 	}
-	return bloom.BuildConfig(bloom.SizingTarget, bloom.TargetSpec{
+
+	fc, err := bloom.BuildFilterConfig(bloom.SizingTarget, bloom.TargetSpec{
 		Capacity: *f.Capacity,
 		FPR:      *f.FPR,
 		Bounds: bloom.SizingBounds{
 			MinBits:      *f.MinBits,
 			MaxHashCount: uint(*f.MaxHashCount),
 		},
-	}, bloom.ExplicitSpec{}, opts...)
+	}, bloom.ExplicitSpec{})
+	if err != nil {
+		return bloom.FilterConfig{}, err
+	}
+	fc.Hash = hash
+	return fc, nil
+}
+
+// CountingConfig builds a bloom.CountingConfig from parsed flag values.
+func (f *Flags) CountingConfig() (bloom.CountingConfig, error) {
+	fc, err := f.FilterConfig()
+	if err != nil {
+		return bloom.CountingConfig{}, err
+	}
+	cc := bloom.CountingConfig{Filter: fc}
+	if f.CounterWidth == nil {
+		return cc, nil
+	}
+	switch *f.CounterWidth {
+	case 8:
+	case 16, 32:
+		cc.CounterWidth = uint8(*f.CounterWidth)
+	default:
+		return bloom.CountingConfig{}, fmt.Errorf("counter-width must be 8, 16, or 32")
+	}
+	if err := cc.Validate(); err != nil {
+		return bloom.CountingConfig{}, err
+	}
+	return cc, nil
+}
+
+// Config builds a bloom.Config from parsed flag values. Prefer FilterConfig when
+// constructing filters directly; Config remains for legacy call sites.
+func (f *Flags) Config() (bloom.Config, error) {
+	fc, err := f.FilterConfig()
+	if err != nil {
+		return bloom.Config{}, err
+	}
+	cfg := fc.Config()
+	if f.CounterWidth != nil && *f.CounterWidth != 8 {
+		switch *f.CounterWidth {
+		case 16, 32:
+			cfg.CounterWidth = uint8(*f.CounterWidth)
+		default:
+			return bloom.Config{}, fmt.Errorf("counter-width must be 8, 16, or 32")
+		}
+	}
+	return cfg, nil
 }
 
 // ConfigOptions returns bloom.ConfigOption values for hash and sizing bounds.
+// Deprecated: new code should use FilterConfig, which applies bounds once via TargetSpec.
 func (f *Flags) ConfigOptions() ([]bloom.ConfigOption, error) {
 	strategy, err := bloom.ParseStrategy(*f.Hash)
 	if err != nil {
@@ -93,4 +151,12 @@ func (f *Flags) ConfigOptions() ([]bloom.ConfigOption, error) {
 		}
 	}
 	return opts, nil
+}
+
+func (f *Flags) hashConfig() (bloom.HashConfig, error) {
+	strategy, err := bloom.ParseStrategy(*f.Hash)
+	if err != nil {
+		return bloom.HashConfig{}, err
+	}
+	return bloom.HashConfig{Strategy: strategy, Seed: *f.Seed}, nil
 }

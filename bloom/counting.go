@@ -18,10 +18,16 @@ type CountingFilter struct {
 
 // NewCountingFilter constructs a CountingFilter from cfg.
 func NewCountingFilter(cfg Config) (*CountingFilter, error) {
+	return NewCountingFilterFrom(cfg.CountingConfig())
+}
+
+// NewCountingFilterFrom constructs a CountingFilter from structured counting configuration.
+func NewCountingFilterFrom(cc CountingConfig) (*CountingFilter, error) {
+	cfg := cc.Config()
 	if err := cfg.validateCounterWidth(); err != nil {
 		return nil, err
 	}
-	m, k, err := cfg.Size()
+	m, k, err := cc.Filter.Size()
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +41,7 @@ func NewCountingFilter(cfg Config) (*CountingFilter, error) {
 		m:      m,
 		k:      k,
 		width:  width,
-		hasher: cfg.Hasher(),
+		hasher: cc.Filter.Hasher(),
 	}, nil
 }
 

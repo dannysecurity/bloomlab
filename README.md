@@ -344,49 +344,52 @@ go test -bench=ReportMetrics ./benchcompare/
 
 ### Configuration
 
-Sizing mode is explicit on `bloom.Config`: call `Mode()` for `SizingTarget` or `SizingExplicit`, or use `Target()` / `Explicit()` to read the typed inputs. `Bounds()` returns target-mode limits (`SizingBounds` with package defaults via `Resolved()`).
-
-Prefer typed specs when assembling configuration from structured inputs (CLI flags, config files, or tests):
+Configuration separates **sizing** (how many bits and hash functions) from **hashing** (which hash family and seed). The structured `FilterConfig` type makes that split explicit:
 
 ```go
-cfg, err := bloom.BuildConfig(bloom.SizingTarget, bloom.TargetSpec{
+fc, err := bloom.BuildFilterConfig(bloom.SizingTarget, bloom.TargetSpec{
 	Capacity: 10_000,
 	FPR:      0.01,
 	Bounds:   bloom.SizingBounds{MinBits: 256},
 }, bloom.ExplicitSpec{},
-	bloom.WithHash(bloom.HashMurmur3),
 )
+fc = fc.Apply(bloom.WithFilterHash(bloom.HashMurmur3))
+f, err := bloom.NewFilterFrom(fc)
 ```
 
-`ConfigFromTarget` and `ConfigFromExplicit` skip validation; use `BuildConfig` or call `Validate()` before constructing filters.
+`SizingConfig` uses a discriminated `Mode` field (`SizingTarget` or `SizingExplicit`) so target and explicit inputs never share the same flat struct. Counting filters add counter width via `CountingConfig`:
+
+```go
+cc, err := bloom.BuildCountingConfig(bloom.SizingExplicit, bloom.TargetSpec{},
+	bloom.ExplicitSpec{Bits: 1024, HashCount: 4},
+	bloom.WithCountingCounterWidth(16),
+)
+cf, err := bloom.NewCountingFilterFrom(cc)
+```
+
+The legacy `bloom.Config` type remains available and converts cleanly: `cfg.FilterConfig()` and `fc.Config()` round-trip sizing, hash, and counter settings. Existing helpers like `TargetConfig` and `NewFilter(cfg)` continue to work.
+
+Sizing mode on either type: call `Mode()` for `SizingTarget` or `SizingExplicit`, or use `Target()` / `Explicit()` on `Config` to read typed inputs. `Bounds()` returns target-mode limits (`SizingBounds` with package defaults via `Resolved()`).
 
 | Helper | Use when |
 |--------|----------|
-| `TargetConfig(n, p, opts...)` | Derive `m` and `k` from expected capacity and FPR |
-| `ExplicitConfig(m, k, opts...)` | Fix bit count and hash functions directly |
-| `ConfigFromTarget(spec, opts...)` / `ConfigFromExplicit(spec, opts...)` | Build from typed `TargetSpec` / `ExplicitSpec` |
-| `BuildConfig(mode, target, explicit, opts...)` | Validate typed specs and return a ready `Config` |
-| `Config.Apply(opts...)` | Apply construction options to an existing config copy |
-| `Config.Mode()` / `Target()` / `Explicit()` | Inspect sizing mode and inputs |
-| `Config.Bounds()` / `SizingBounds.Resolved()` | Read or resolve target sizing limits |
-| `WithHash(strategy)` / `WithSeed(seed)` / `WithHashConfig(h)` | Set hash family, seed, or full hash config at construction |
-| `Config.WithSeed` / `WithHash` / `WithSizingBounds` / `WithMinBits` / `WithMaxHashCount` / `WithCounterWidth` / `WithHashConfig` | Immutable copy updates after construction |
-| `WithSizingBounds(b)` / `WithMinBits(m)` / `WithMaxHashCount(k)` | Bound derived sizing on target configs |
-| `WithCounterWidth(8\|16\|32)` | Select counter width for counting filters |
-| `HashConfig` | Hash-only settings (`Strategy`, `Seed`); embedded in `Config.Hash` |
-| `TheoryFalsePositiveRate(n, m, k)` | Theoretical FPR after `n` inserts |
-| `TheoryFillFraction(n, m, k)` | Expected fraction of bits set after `n` inserts |
-| `PlanSizing(n, p, opts...)` | Resolve `(m, k)` from capacity and FPR |
-| `PlanSizingFrom(cfg)` | Resolve sizing from an existing config (honors bounds) |
-| `FormatSizingDerivation(plan)` | Render numbered FPR derivation steps for a sizing plan |
-| `ContinuousOptimalM(n, p)` / `ContinuousOptimalK(m, n)` | Real-valued sizing before truncation |
-| `Config.TheoryFPRAt(n)` | FPR for a config at a given insert count |
-| `Filter.TheoryFPR()` / `CountingFilter.TheoryFPR()` | FPR at current insert count |
-| `Config.Validate()` / `Config.Size()` | Inspect or resolve sizing before construction |
-| `NewFilter(cfg)` / `NewCountingFilter(cfg)` | Primary constructors |
-| `New(n, p)` / `NewCountingFromTarget(n, p)` | Legacy shorthands for target sizing |
+| `TargetFilter(n, p, opts...)` / `ExplicitFilter(m, k, opts...)` | Structured config without validation |
+| `BuildFilterConfig(mode, target, explicit, opts...)` | Validate typed specs and return `FilterConfig` |
+| `TargetCounting` / `ExplicitCounting` / `BuildCountingConfig` | Counting filter configuration |
+| `NewFilterFrom(fc)` / `NewCountingFilterFrom(cc)` | Construct filters from structured config |
+| `FilterConfig.Config()` / `Config.FilterConfig()` | Convert between structured and legacy forms |
+| `TargetConfig(n, p, opts...)` | Legacy: derive `m` and `k` from capacity and FPR |
+| `ExplicitConfig(m, k, opts...)` | Legacy: fix bit count and hash functions directly |
+| `BuildConfig(mode, target, explicit, opts...)` | Legacy validated builder returning `Config` |
+| `WithFilterHash` / `WithFilterSeed` / `WithFilterSizingBounds` | Options on `FilterConfig` |
+| `WithCountingCounterWidth` / `WithCountingHash` | Options on `CountingConfig` |
+| `Config.Apply(opts...)` | Apply legacy construction options to an existing config copy |
+| `WithHash(strategy)` / `WithSeed(seed)` / `WithHashConfig(h)` | Legacy hash options at construction |
+| `Config.WithSeed` / `WithHash` / `WithSizingBounds` / `WithCounterWidth` | Immutable copy updates on `Config` |
+| `NewFilter(cfg)` / `NewCountingFilter(cfg)` | Legacy constructors (delegate to structured config internally) |
+| `New(n, p)` / `NewCountingFromTarget(n, p)` | Shorthand for target sizing |
 
-CLIs share filter flags via `cmd/internal/filterflags`: target sizing uses `-n`/`-p`; explicit sizing uses `-m`/`-k`. Stream dedup tools share output flags via `cmd/internal/streamflags` (`-quiet`, `-json`, `-ignore-case`, `-novel-only`).
+CLIs share filter flags via `cmd/internal/filterflags`: target sizing uses `-n`/`-p`; explicit sizing uses `-m`/`-k`. Flags resolve to `FilterConfig` internally (`FilterConfig()` / `CountingConfig()`); `Config()` remains for legacy call sites. Stream dedup tools share output flags via `cmd/internal/streamflags` (`-quiet`, `-json`, `-ignore-case`, `-novel-only`).
 
 Target sizing uses:
 

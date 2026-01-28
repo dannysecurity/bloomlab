@@ -8,6 +8,64 @@ import (
 	"github.com/dannysecurity/bloomlab/bloom"
 )
 
+func TestFlagsFilterConfigExplicitSizing(t *testing.T) {
+	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+	f := Register(1000)
+	if err := flag.CommandLine.Parse([]string{"-m", "512", "-k", "6", "-hash", "xxhash"}); err != nil {
+		t.Fatal(err)
+	}
+
+	fc, err := f.FilterConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fc.Mode() != bloom.SizingExplicit {
+		t.Fatalf("Mode() = %v, want explicit", fc.Mode())
+	}
+	if fc.Sizing.Explicit.Bits != 512 || fc.Sizing.Explicit.HashCount != 6 {
+		t.Fatalf("explicit sizing = m=%d k=%d, want 512 and 6", fc.Sizing.Explicit.Bits, fc.Sizing.Explicit.HashCount)
+	}
+	if fc.Hash.Strategy != bloom.HashXXHash {
+		t.Fatalf("Hash.Strategy = %v, want xxhash", fc.Hash.Strategy)
+	}
+}
+
+func TestFlagsFilterConfigWithBounds(t *testing.T) {
+	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+	f := Register(1000)
+	if err := flag.CommandLine.Parse([]string{"-min-bits", "256", "-max-k", "8"}); err != nil {
+		t.Fatal(err)
+	}
+
+	fc, err := f.FilterConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bounds := fc.Sizing.Target.Bounds
+	if bounds.MinBits != 256 || bounds.MaxHashCount != 8 {
+		t.Fatalf("bounds = minBits=%d maxK=%d, want 256 and 8", bounds.MinBits, bounds.MaxHashCount)
+	}
+}
+
+func TestFlagsCountingConfig(t *testing.T) {
+	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+	f := RegisterCounting(1000)
+	if err := flag.CommandLine.Parse([]string{"-counter-width", "32", "-hash", "murmur3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	cc, err := f.CountingConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cc.CounterWidth != 32 {
+		t.Fatalf("CounterWidth = %d, want 32", cc.CounterWidth)
+	}
+	if cc.Filter.Hash.Strategy != bloom.HashMurmur3 {
+		t.Fatalf("Hash = %+v, want murmur3", cc.Filter.Hash)
+	}
+}
+
 func TestFlagsConfigExplicitSizing(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 	f := Register(1000)

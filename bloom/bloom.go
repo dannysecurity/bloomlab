@@ -11,7 +11,12 @@ type Filter struct {
 
 // NewFilter constructs a Filter from cfg.
 func NewFilter(cfg Config) (*Filter, error) {
-	m, k, err := cfg.Size()
+	return NewFilterFrom(cfg.FilterConfig())
+}
+
+// NewFilterFrom constructs a Filter from structured filter configuration.
+func NewFilterFrom(fc FilterConfig) (*Filter, error) {
+	m, k, err := fc.Size()
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +24,7 @@ func NewFilter(cfg Config) (*Filter, error) {
 		bits:   make([]byte, (m+7)/8),
 		m:      m,
 		k:      k,
-		hasher: cfg.Hasher(),
+		hasher: fc.Hasher(),
 	}, nil
 }
 
