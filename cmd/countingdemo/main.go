@@ -15,12 +15,12 @@ func main() {
 	remove := flag.Bool("remove", false, "remove words instead of adding")
 	flag.Parse()
 
-	cfg, err := flags.Config()
+	cc, err := flags.CountingConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "countingdemo: %v\n", err)
 		os.Exit(1)
 	}
-	cf, err := bloom.NewCountingFilter(cfg)
+	cf, err := bloom.NewCountingFilterFrom(cc)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "countingdemo: %v\n", err)
 		os.Exit(1)
@@ -28,7 +28,7 @@ func main() {
 
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Println(cfg.String())
+		fmt.Println(cc.Filter.String())
 		fmt.Println("Usage: countingdemo [flags] <word> ...")
 		os.Exit(0)
 	}

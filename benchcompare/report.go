@@ -14,7 +14,7 @@ func configHeader(cfg Config) string {
 		hashNote = fmt.Sprintf(", hash=%s", cfg.Bloom.Hash.String())
 	}
 	return fmt.Sprintf("Bloom filter vs hash set (n=%d, p=%.4f, lookup-repeats=%d%s)",
-		cfg.Bloom.ExpectedCapacity, cfg.Bloom.FalsePositiveRate, cfg.LookupRepeats, hashNote)
+		cfg.Bloom.ExpectedCapacity(), cfg.Bloom.FalsePositiveRate(), cfg.LookupRepeats, hashNote)
 }
 
 // FormatReport renders comparisons as a fixed-width table suitable for stdout.
@@ -55,7 +55,7 @@ func FormatMarkdown(cfg Config, results []Comparison) string {
 		hashNote = fmt.Sprintf(", hash `%s`", cfg.Bloom.Hash.String())
 	}
 	fmt.Fprintf(&b, "Configuration: `n=%d`, `p=%.4f`, lookup repeats `%d`%s.\n\n",
-		cfg.Bloom.ExpectedCapacity, cfg.Bloom.FalsePositiveRate, cfg.LookupRepeats, hashNote)
+		cfg.Bloom.ExpectedCapacity(), cfg.Bloom.FalsePositiveRate(), cfg.LookupRepeats, hashNote)
 	fmt.Fprintln(&b, "| Scenario | Bloom ns/op | Hash set ns/op | Speedup | Bloom B/item | Hash set B/item | Space ratio | Bloom allocs/op | Hash set allocs/op | Alloc ratio | Notes |")
 	fmt.Fprintln(&b, "|----------|-------------|----------------|---------|--------------|-----------------|-------------|-----------------|--------------------|-------------|-------|")
 	for _, cmp := range results {
@@ -80,7 +80,7 @@ func FormatMarkdown(cfg Config, results []Comparison) string {
 // FormatFPRSweep renders add-scenario comparisons across false positive targets.
 func FormatFPRSweep(cfg Config, rates []float64, results []Comparison) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Bloom filter vs hash set — FPR sweep (n=%d, add workload)\n\n", cfg.Bloom.ExpectedCapacity)
+	fmt.Fprintf(&b, "Bloom filter vs hash set — FPR sweep (n=%d, add workload)\n\n", cfg.Bloom.ExpectedCapacity())
 
 	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "TARGET p\tBLOOM B/item\tHASHSET B/item\tSPACE\tBLOOM ns/op\tHASHSET ns/op\tSPEEDUP\tBLOOM allocs/op\tHASHSET allocs/op\tALLOCS")
@@ -108,7 +108,7 @@ func FormatFPRSweep(cfg Config, rates []float64, results []Comparison) string {
 func FormatFPRSweepMarkdown(cfg Config, rates []float64, results []Comparison) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Bloom filter vs hash set — FPR sweep\n\n")
-	fmt.Fprintf(&b, "Add workload at `n=%d` across target false positive rates.\n\n", cfg.Bloom.ExpectedCapacity)
+	fmt.Fprintf(&b, "Add workload at `n=%d` across target false positive rates.\n\n", cfg.Bloom.ExpectedCapacity())
 	fmt.Fprintln(&b, "| Target p | Bloom B/item | Hash set B/item | Space ratio | Bloom ns/op | Hash set ns/op | Speedup | Bloom allocs/op | Hash set allocs/op | Alloc ratio |")
 	fmt.Fprintln(&b, "|----------|--------------|-----------------|-------------|-------------|----------------|---------|-----------------|--------------------|-------------|")
 	for i, cmp := range results {
@@ -132,7 +132,7 @@ func FormatFPRSweepMarkdown(cfg Config, rates []float64, results []Comparison) s
 func FormatHashSweep(cfg Config, strategies []bloom.Strategy, results []Comparison) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Bloom filter vs hash set — hash sweep (n=%d, p=%.4f, add workload)\n\n",
-		cfg.Bloom.ExpectedCapacity, cfg.Bloom.FalsePositiveRate)
+		cfg.Bloom.ExpectedCapacity(), cfg.Bloom.FalsePositiveRate())
 
 	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "HASH\tBLOOM ns/op\tHASHSET ns/op\tSPEEDUP\tBLOOM B/item\tHASHSET B/item\tSPACE\tBLOOM allocs/op\tHASHSET allocs/op\tALLOCS")
@@ -160,7 +160,7 @@ func FormatHashSweep(cfg Config, strategies []bloom.Strategy, results []Comparis
 func FormatSizeSweep(cfg Config, counts []uint64, results []Comparison) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Bloom filter vs hash set — size sweep (p=%.4f, add workload)\n\n",
-		cfg.Bloom.FalsePositiveRate)
+		cfg.Bloom.FalsePositiveRate())
 
 	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "ITEMS n\tBLOOM B/item\tHASHSET B/item\tSPACE\tBLOOM ns/op\tHASHSET ns/op\tSPEEDUP\tBLOOM allocs/op\tHASHSET allocs/op\tALLOCS")
@@ -188,7 +188,7 @@ func FormatSizeSweep(cfg Config, counts []uint64, results []Comparison) string {
 func FormatSizeSweepMarkdown(cfg Config, counts []uint64, results []Comparison) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Bloom filter vs hash set — size sweep\n\n")
-	fmt.Fprintf(&b, "Add workload at `p=%.4f` across item counts.\n\n", cfg.Bloom.FalsePositiveRate)
+	fmt.Fprintf(&b, "Add workload at `p=%.4f` across item counts.\n\n", cfg.Bloom.FalsePositiveRate())
 	fmt.Fprintln(&b, "| Items n | Bloom B/item | Hash set B/item | Space ratio | Bloom ns/op | Hash set ns/op | Speedup | Bloom allocs/op | Hash set allocs/op | Alloc ratio |")
 	fmt.Fprintln(&b, "|---------|--------------|-----------------|-------------|-------------|----------------|---------|-----------------|--------------------|-------------|")
 	for i, cmp := range results {
@@ -213,7 +213,7 @@ func FormatHashSweepMarkdown(cfg Config, strategies []bloom.Strategy, results []
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Bloom filter vs hash set — hash sweep\n\n")
 	fmt.Fprintf(&b, "Add workload at `n=%d`, `p=%.4f` across hash strategies.\n\n",
-		cfg.Bloom.ExpectedCapacity, cfg.Bloom.FalsePositiveRate)
+		cfg.Bloom.ExpectedCapacity(), cfg.Bloom.FalsePositiveRate())
 	fmt.Fprintln(&b, "| Hash | Bloom ns/op | Hash set ns/op | Speedup | Bloom B/item | Hash set B/item | Space ratio | Bloom allocs/op | Hash set allocs/op | Alloc ratio |")
 	fmt.Fprintln(&b, "|------|-------------|----------------|---------|--------------|-----------------|-------------|-----------------|--------------------|-------------|")
 	for i, cmp := range results {
@@ -237,7 +237,7 @@ func FormatHashSweepMarkdown(cfg Config, strategies []bloom.Strategy, results []
 func FormatLookupMixSweep(cfg Config, ratios []float64, results []Comparison) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Bloom filter vs hash set — lookup mix sweep (n=%d, p=%.4f, lookup-repeats=%d)\n\n",
-		cfg.Bloom.ExpectedCapacity, cfg.Bloom.FalsePositiveRate, cfg.LookupRepeats)
+		cfg.Bloom.ExpectedCapacity(), cfg.Bloom.FalsePositiveRate(), cfg.LookupRepeats)
 
 	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "HIT RATIO\tBLOOM ns/op\tHASHSET ns/op\tSPEEDUP\tBLOOM B/item\tHASHSET B/item\tSPACE\tBLOOM allocs/op\tHASHSET allocs/op\tALLOCS")
@@ -266,7 +266,7 @@ func FormatLookupMixSweepMarkdown(cfg Config, ratios []float64, results []Compar
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Bloom filter vs hash set — lookup mix sweep\n\n")
 	fmt.Fprintf(&b, "Contains-mixed workload at `n=%d`, `p=%.4f`, lookup repeats `%d` across hit ratios.\n\n",
-		cfg.Bloom.ExpectedCapacity, cfg.Bloom.FalsePositiveRate, cfg.LookupRepeats)
+		cfg.Bloom.ExpectedCapacity(), cfg.Bloom.FalsePositiveRate(), cfg.LookupRepeats)
 	fmt.Fprintln(&b, "| Hit ratio | Bloom ns/op | Hash set ns/op | Speedup | Bloom B/item | Hash set B/item | Space ratio | Bloom allocs/op | Hash set allocs/op | Alloc ratio |")
 	fmt.Fprintln(&b, "|-----------|-------------|----------------|---------|--------------|-----------------|-------------|-----------------|--------------------|-------------|")
 	for i, cmp := range results {

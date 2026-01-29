@@ -48,21 +48,34 @@ type SizingPlan struct {
 // PlanSizing resolves m and k from expected capacity and target FPR, then
 // computes the theoretical fill fraction and achieved FPR at capacity.
 //
-// Prefer PlanSizingFrom when you already have a bloom.Config (for example from
-// CLI flags) so sizing bounds and hash options are not dropped.
+// Prefer PlanSizingFromFilter when you already have a FilterConfig (for example
+// from CLI flags) so sizing bounds and hash options are not dropped.
 func PlanSizing(expectedCapacity uint64, targetFPR float64, opts ...ConfigOption) (SizingPlan, error) {
 	return PlanSizingFrom(TargetConfig(expectedCapacity, targetFPR, opts...))
+}
+
+// PlanSizingFilter resolves m and k from expected capacity and target FPR using
+// the structured FilterConfig API.
+func PlanSizingFilter(expectedCapacity uint64, targetFPR float64, opts ...FilterOption) (SizingPlan, error) {
+	return PlanSizingFromFilter(TargetFilter(expectedCapacity, targetFPR, opts...))
 }
 
 // PlanSizingFrom resolves m and k from cfg, then computes theoretical fill
 // fraction and achieved FPR at the config's expected capacity. The config must
 // use target sizing; explicit configs return ErrInvalidCapacity.
 func PlanSizingFrom(cfg Config) (SizingPlan, error) {
-	spec, ok := cfg.Target()
+	return PlanSizingFromFilter(cfg.FilterConfig())
+}
+
+// PlanSizingFromFilter resolves m and k from fc, then computes theoretical fill
+// fraction and achieved FPR at the config's expected capacity. The config must
+// use target sizing; explicit configs return ErrInvalidCapacity.
+func PlanSizingFromFilter(fc FilterConfig) (SizingPlan, error) {
+	spec, ok := fc.Target()
 	if !ok {
 		return SizingPlan{}, ErrInvalidCapacity
 	}
-	m, k, err := cfg.Size()
+	m, k, err := fc.Size()
 	if err != nil {
 		return SizingPlan{}, err
 	}
@@ -92,7 +105,13 @@ func (p SizingPlan) String() string {
 // TheoryFPRAt returns the theoretical FPR after n inserts using the resolved
 // m and k from the configuration.
 func (c Config) TheoryFPRAt(n uint64) (float64, error) {
-	m, k, err := c.Size()
+	return c.FilterConfig().TheoryFPRAt(n)
+}
+
+// TheoryFPRAt returns the theoretical FPR after n inserts using the resolved
+// m and k from the filter configuration.
+func (fc FilterConfig) TheoryFPRAt(n uint64) (float64, error) {
+	m, k, err := fc.Size()
 	if err != nil {
 		return 0, err
 	}

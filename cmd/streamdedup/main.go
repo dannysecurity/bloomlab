@@ -16,12 +16,12 @@ func main() {
 	stream := streamflags.Register()
 	flag.Parse()
 
-	cfg, err := flags.Config()
+	fc, err := flags.FilterConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "streamdedup: %v\n", err)
 		os.Exit(1)
 	}
-	f, err := bloom.NewFilter(cfg)
+	f, err := bloom.NewFilterFrom(fc)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "streamdedup: %v\n", err)
 		os.Exit(1)

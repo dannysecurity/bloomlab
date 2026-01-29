@@ -33,16 +33,16 @@ var AllScenarios = []Scenario{
 }
 
 // Config controls Bloom filter sizing and benchmark runtime options.
-// Bloom holds the canonical bloom.Config; LookupRepeats and LookupHitRatio are
+// Bloom holds the canonical bloom.FilterConfig; LookupRepeats and LookupHitRatio are
 // benchcompare-only settings.
 type Config struct {
-	Bloom          bloom.Config
+	Bloom          bloom.FilterConfig
 	LookupRepeats  int
 	LookupHitRatio float64
 }
 
-// NewConfig wraps a validated bloom.Config with benchcompare defaults.
-func NewConfig(bloomCfg bloom.Config) Config {
+// NewConfig wraps a validated bloom.FilterConfig with benchcompare defaults.
+func NewConfig(bloomCfg bloom.FilterConfig) Config {
 	return Config{
 		Bloom:          bloomCfg,
 		LookupRepeats:  1,
@@ -52,5 +52,5 @@ func NewConfig(bloomCfg bloom.Config) Config {
 
 // DefaultConfig returns settings aligned with bloom/bloom_bench_test.go.
 func DefaultConfig() Config {
-	return NewConfig(bloom.TargetConfig(100_000, 0.01))
+	return NewConfig(bloom.TargetFilter(100_000, 0.01))
 }

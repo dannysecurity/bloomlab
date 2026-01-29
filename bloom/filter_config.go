@@ -263,6 +263,63 @@ func WithCountingCounterWidth(width uint8) CountingOption {
 	}
 }
 
+// Target returns target sizing inputs when Mode is SizingTarget.
+func (fc FilterConfig) Target() (TargetSpec, bool) {
+	if fc.Sizing.Mode != SizingTarget {
+		return TargetSpec{}, false
+	}
+	return fc.Sizing.Target, true
+}
+
+// Explicit returns explicit sizing inputs when Mode is SizingExplicit.
+func (fc FilterConfig) Explicit() (ExplicitSpec, bool) {
+	if fc.Sizing.Mode != SizingExplicit {
+		return ExplicitSpec{}, false
+	}
+	return fc.Sizing.Explicit, true
+}
+
+// ExpectedCapacity returns the benchmark item count for target sizing, or m for explicit sizing.
+func (fc FilterConfig) ExpectedCapacity() uint64 {
+	if spec, ok := fc.Target(); ok {
+		return spec.Capacity
+	}
+	return fc.Sizing.Explicit.Bits
+}
+
+// FalsePositiveRate returns the target FPR in target mode, or zero in explicit mode.
+func (fc FilterConfig) FalsePositiveRate() float64 {
+	if spec, ok := fc.Target(); ok {
+		return spec.FPR
+	}
+	return 0
+}
+
+// WithFalsePositiveRate returns a copy with an updated target FPR.
+func (fc FilterConfig) WithFalsePositiveRate(p float64) FilterConfig {
+	out := fc
+	if out.Sizing.Mode == SizingTarget {
+		out.Sizing.Target.FPR = p
+	}
+	return out
+}
+
+// WithExpectedCapacity returns a copy with an updated target capacity.
+func (fc FilterConfig) WithExpectedCapacity(n uint64) FilterConfig {
+	out := fc
+	if out.Sizing.Mode == SizingTarget {
+		out.Sizing.Target.Capacity = n
+	}
+	return out
+}
+
+// WithHashStrategy returns a copy using the given hash strategy.
+func (fc FilterConfig) WithHashStrategy(strategy Strategy) FilterConfig {
+	out := fc
+	out.Hash.Strategy = strategy
+	return out
+}
+
 // Apply returns a copy of fc with the given options applied.
 func (fc FilterConfig) Apply(opts ...FilterOption) FilterConfig {
 	applyFilterOptions(&fc, opts)
@@ -355,7 +412,23 @@ func (cc CountingConfig) Validate() error {
 	if err := cc.Filter.Validate(); err != nil {
 		return err
 	}
-	return cc.Config().validateCounterWidth()
+	return cc.validateCounterWidth()
+}
+
+func (cc CountingConfig) resolvedCounterWidth() uint8 {
+	if cc.CounterWidth == 0 || cc.CounterWidth == 8 {
+		return 8
+	}
+	return cc.CounterWidth
+}
+
+func (cc CountingConfig) validateCounterWidth() error {
+	switch cc.resolvedCounterWidth() {
+	case 8, 16, 32:
+		return nil
+	default:
+		return ErrInvalidCounterWidth
+	}
 }
 
 // Config flattens cc into the legacy Config representation.

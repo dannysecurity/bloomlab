@@ -23,15 +23,14 @@ func NewCountingFilter(cfg Config) (*CountingFilter, error) {
 
 // NewCountingFilterFrom constructs a CountingFilter from structured counting configuration.
 func NewCountingFilterFrom(cc CountingConfig) (*CountingFilter, error) {
-	cfg := cc.Config()
-	if err := cfg.validateCounterWidth(); err != nil {
+	if err := cc.Validate(); err != nil {
 		return nil, err
 	}
 	m, k, err := cc.Filter.Size()
 	if err != nil {
 		return nil, err
 	}
-	width := cfg.resolvedCounterWidth()
+	width := cc.resolvedCounterWidth()
 	store, err := newCounterStore(m, width)
 	if err != nil {
 		return nil, err

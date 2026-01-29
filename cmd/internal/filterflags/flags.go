@@ -56,11 +56,10 @@ func (f *Flags) FilterConfig() (bloom.FilterConfig, error) {
 		fc, err := bloom.BuildFilterConfig(bloom.SizingExplicit, bloom.TargetSpec{}, bloom.ExplicitSpec{
 			Bits:      *f.Bits,
 			HashCount: uint(*f.HashCount),
-		})
+		}, bloom.WithFilterHashConfig(hash))
 		if err != nil {
 			return bloom.FilterConfig{}, err
 		}
-		fc.Hash = hash
 		return fc, nil
 	}
 	if *f.HashCount != 0 {
@@ -74,11 +73,10 @@ func (f *Flags) FilterConfig() (bloom.FilterConfig, error) {
 			MinBits:      *f.MinBits,
 			MaxHashCount: uint(*f.MaxHashCount),
 		},
-	}, bloom.ExplicitSpec{})
+	}, bloom.ExplicitSpec{}, bloom.WithFilterHashConfig(hash))
 	if err != nil {
 		return bloom.FilterConfig{}, err
 	}
-	fc.Hash = hash
 	return fc, nil
 }
 

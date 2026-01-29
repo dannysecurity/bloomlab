@@ -98,7 +98,7 @@ func TestParseFPRRatesTable(t *testing.T) {
 }
 
 func TestCompareFPRSweepValidationTable(t *testing.T) {
-	cfg := Config{Bloom: bloom.TargetConfig(500, 0.01), LookupRepeats: 1}
+	cfg := Config{Bloom: bloom.TargetFilter(500, 0.01), LookupRepeats: 1}
 	tests := []struct {
 		name    string
 		rates   []float64

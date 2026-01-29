@@ -17,12 +17,12 @@ func main() {
 	removePrefix := flag.String("remove-prefix", "-", "lines with this prefix remove the remainder from the set instead of classifying")
 	flag.Parse()
 
-	cfg, err := flags.Config()
+	cc, err := flags.CountingConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "countingdedup: %v\n", err)
 		os.Exit(1)
 	}
-	cf, err := bloom.NewCountingFilter(cfg)
+	cf, err := bloom.NewCountingFilterFrom(cc)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "countingdedup: %v\n", err)
 		os.Exit(1)

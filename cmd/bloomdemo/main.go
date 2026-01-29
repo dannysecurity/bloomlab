@@ -13,12 +13,12 @@ func main() {
 	flags := filterflags.Register(10_000)
 	flag.Parse()
 
-	cfg, err := flags.Config()
+	fc, err := flags.FilterConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "bloomdemo: %v\n", err)
 		os.Exit(1)
 	}
-	f, err := bloom.NewFilter(cfg)
+	f, err := bloom.NewFilterFrom(fc)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "bloomdemo: %v\n", err)
 		os.Exit(1)
@@ -26,7 +26,7 @@ func main() {
 
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Println(cfg.String())
+		fmt.Println(fc.String())
 		fmt.Println("Usage: bloomdemo [flags] <word> ...")
 		os.Exit(0)
 	}

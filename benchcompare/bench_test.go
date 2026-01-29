@@ -74,7 +74,7 @@ func BenchmarkCompareAllDefault(b *testing.B) {
 }
 
 func smallBenchConfig() Config {
-	return Config{Bloom: bloom.TargetConfig(5_000, 0.01),
+	return Config{Bloom: bloom.TargetFilter(5_000, 0.01),
 		LookupRepeats:     2,
 	}
 }

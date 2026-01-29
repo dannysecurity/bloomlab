@@ -110,3 +110,46 @@ func TestPlanSizingFromRejectsExplicitConfig(t *testing.T) {
 		t.Fatalf("PlanSizingFrom(explicit) = %v, want ErrInvalidCapacity", err)
 	}
 }
+
+func TestPlanSizingFromFilter(t *testing.T) {
+	fc := TargetFilter(100_000, 0.001, WithFilterSizingBounds(SizingBounds{MinBits: 256, MaxHashCount: 8}))
+	plan, err := PlanSizingFromFilter(fc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Bits < 256 {
+		t.Errorf("Bits = %d, want >= 256", plan.Bits)
+	}
+	if plan.HashCount > 8 {
+		t.Errorf("HashCount = %d, want <= 8", plan.HashCount)
+	}
+
+	direct, err := PlanSizingFilter(100_000, 0.001, WithFilterSizingBounds(SizingBounds{MinBits: 256, MaxHashCount: 8}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan != direct {
+		t.Fatalf("PlanSizingFromFilter = %+v, PlanSizingFilter = %+v", plan, direct)
+	}
+}
+
+func TestPlanSizingFromFilterRejectsExplicitConfig(t *testing.T) {
+	if _, err := PlanSizingFromFilter(ExplicitFilter(128, 4)); err != ErrInvalidCapacity {
+		t.Fatalf("PlanSizingFromFilter(explicit) = %v, want ErrInvalidCapacity", err)
+	}
+}
+
+func TestFilterConfigTheoryFPRAt(t *testing.T) {
+	fc := TargetFilter(1000, 0.01)
+	fpr, err := fc.TheoryFPRAt(1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := fc.Config().TheoryFPRAt(1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fpr != legacy {
+		t.Fatalf("FilterConfig.TheoryFPRAt = %g, Config.TheoryFPRAt = %g", fpr, legacy)
+	}
+}

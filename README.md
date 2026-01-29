@@ -19,7 +19,7 @@ go get github.com/dannysecurity/bloomlab
 
 ## Quick start
 
-Configuration is expressed through `bloom.Config`, which both filter types share. Sizing and hashing are configured separately — hash settings do not affect `m` or `k`:
+Configuration is expressed through `bloom.FilterConfig`, which separates sizing from hashing. Hash settings do not affect `m` or `k`:
 
 ```go
 package main
@@ -30,21 +30,28 @@ import (
 )
 
 func main() {
-	cfg := bloom.TargetConfig(10_000, 0.01) // ~10k items, ~1% FPR
-	f, _ := bloom.NewFilter(cfg)
+	fc := bloom.TargetFilter(10_000, 0.01) // ~10k items, ~1% FPR
+	f, _ := bloom.NewFilterFrom(fc)
 	f.Add([]byte("user:42"))
 	fmt.Println(f.Contains([]byte("user:42"))) // true
-	fmt.Println(cfg.String())                  // target n=10000 p=0.01 -> m=... k=...
+	fmt.Println(fc.String())                   // target n=10000 p=0.01 -> m=... k=...
 }
 ```
 
 Pass hash settings as options instead of mutating the config after construction:
 
 ```go
-cfg := bloom.TargetConfig(10_000, 0.01,
-	bloom.WithHash(bloom.HashMurmur3),
-	bloom.WithSeed(42),
+fc := bloom.TargetFilter(10_000, 0.01,
+	bloom.WithFilterHash(bloom.HashMurmur3),
+	bloom.WithFilterSeed(42),
 )
+f, _ := bloom.NewFilterFrom(fc)
+```
+
+The legacy `bloom.Config` type remains available for older call sites:
+
+```go
+cfg := bloom.TargetConfig(10_000, 0.01)
 f, _ := bloom.NewFilter(cfg)
 ```
 
@@ -57,30 +64,30 @@ f, _ := bloom.New(10_000, 0.01)
 ### Counting variant (with deletion)
 
 ```go
-cfg := bloom.TargetConfig(10_000, 0.01)
-cf, _ := bloom.NewCountingFilter(cfg)
+fc := bloom.TargetFilter(10_000, 0.01)
+cf, _ := bloom.NewCountingFilterFrom(bloom.CountingConfig{Filter: fc})
 _ = cf.Add([]byte("session:abc"))
 cf.Remove([]byte("session:abc"))
 fmt.Println(cf.Contains([]byte("session:abc"))) // false
-fmt.Println(cf.TheoryFPR())                       // theoretical FPR at current insert count
+fmt.Println(cf.TheoryFPR())                     // theoretical FPR at current insert count
 ```
 
 For fixed sizing, use explicit configuration:
 
 ```go
-cf, _ := bloom.NewCountingFilter(bloom.ExplicitConfig(1024, 4))
+cf, _ := bloom.NewCountingFilterFrom(bloom.ExplicitCounting(1024, 4))
 ```
 
 Use 16-bit counters when duplicate inserts may exceed 255 per probed position:
 
 ```go
-cf, _ := bloom.NewCountingFilter(bloom.ExplicitConfig(1024, 4, bloom.WithCounterWidth(16)))
+cf, _ := bloom.NewCountingFilterFrom(bloom.ExplicitCounting(1024, 4, bloom.WithCountingCounterWidth(16)))
 ```
 
 Use 32-bit counters for workloads with very high per-position reference counts:
 
 ```go
-cf, _ := bloom.NewCountingFilter(bloom.ExplicitConfig(1024, 4, bloom.WithCounterWidth(32)))
+cf, _ := bloom.NewCountingFilterFrom(bloom.ExplicitCounting(1024, 4, bloom.WithCountingCounterWidth(32)))
 ```
 
 ## False positive rate
@@ -133,7 +140,7 @@ ln(p) = -(m/n) · (ln 2)²   →   m = -n · ln(p) / (ln 2)²
 
 Then `k = round((m/n) · ln 2)` (minimum 1). Integer truncation of `m` and rounding of `k` can push the achieved rate slightly above the target — bloomlab checks this with `TheoryFalsePositiveRate` after sizing.
 
-`PlanSizing(n, p)` resolves `(m, k)` and reports the achieved theoretical FPR and fill fraction at capacity in one call. When you already have a `bloom.Config` (for example from CLI flags), use `PlanSizingFrom(cfg)` so `-min-bits` and `-max-k` bounds are honored. For a numbered walkthrough with your inputs, use `FormatSizingDerivation` or:
+`PlanSizing(n, p)` resolves `(m, k)` and reports the achieved theoretical FPR and fill fraction at capacity in one call. When you already have a `FilterConfig` (for example from CLI flags), use `PlanSizingFromFilter(fc)` so `-min-bits` and `-max-k` bounds are honored. For a numbered walkthrough with your inputs, use `FormatSizingDerivation` or:
 
 ```bash
 go run ./cmd/fprcalc -n 10000 -p 0.01 -derive
@@ -157,7 +164,7 @@ go run ./cmd/fprcalc -n 10000 -p 0.01
 ```
 
 ```go
-plan, _ := bloom.PlanSizingFrom(bloom.TargetConfig(10_000, 0.01))
+plan, _ := bloom.PlanSizingFromFilter(bloom.TargetFilter(10_000, 0.01))
 fmt.Println(plan)
 // target n=10000 p=0.01 -> m=95850 (9.59 bits/item) k=6
 // at capacity: fill≈0.465 (46.5%), theory FPR≈0.01014 (1.014%)
@@ -179,15 +186,15 @@ go run ./cmd/fprcalc -n 10000 -p 0.01 -at 15000
 | Hash quality | Poor mixing can deviate from the independence model |
 | Integer rounding | Truncating `m` and `k` can push theory slightly above `p` (≤ ~20% in tests) |
 
-Use `TheoryFalsePositiveRate(n, m, k)` to evaluate a sizing plan, `TheoryFillFraction(n, m, k)` for expected bit density, `Config.TheoryFPRAt(n)` before construction, or `Filter.TheoryFPR()` at runtime:
+Use `TheoryFalsePositiveRate(n, m, k)` to evaluate a sizing plan, `TheoryFillFraction(n, m, k)` for expected bit density, `FilterConfig.TheoryFPRAt(n)` before construction, or `Filter.TheoryFPR()` at runtime:
 
 ```go
-cfg := bloom.TargetConfig(10_000, 0.01)
-m, k, _ := cfg.Size()
+fc := bloom.TargetFilter(10_000, 0.01)
+m, k, _ := fc.Size()
 fmt.Println(bloom.TheoryFillFraction(10_000, m, k))       // ~0.47
 fmt.Println(bloom.TheoryFalsePositiveRate(10_000, m, k)) // ~0.01
 
-f, _ := bloom.NewFilter(cfg)
+f, _ := bloom.NewFilterFrom(fc)
 for i := 0; i < 10_000; i++ {
 	f.Add([]byte(fmt.Sprintf("key:%d", i)))
 }
@@ -389,7 +396,7 @@ Sizing mode on either type: call `Mode()` for `SizingTarget` or `SizingExplicit`
 | `NewFilter(cfg)` / `NewCountingFilter(cfg)` | Legacy constructors (delegate to structured config internally) |
 | `New(n, p)` / `NewCountingFromTarget(n, p)` | Shorthand for target sizing |
 
-CLIs share filter flags via `cmd/internal/filterflags`: target sizing uses `-n`/`-p`; explicit sizing uses `-m`/`-k`. Flags resolve to `FilterConfig` internally (`FilterConfig()` / `CountingConfig()`); `Config()` remains for legacy call sites. Stream dedup tools share output flags via `cmd/internal/streamflags` (`-quiet`, `-json`, `-ignore-case`, `-novel-only`).
+CLIs share filter flags via `cmd/internal/filterflags`: target sizing uses `-n`/`-p`; explicit sizing uses `-m`/`-k`. Demos and tools resolve flags through `FilterConfig()` / `CountingConfig()` and construct filters with `NewFilterFrom` / `NewCountingFilterFrom`. The legacy `Config()` helper remains for round-trip compatibility. Stream dedup tools share output flags via `cmd/internal/streamflags` (`-quiet`, `-json`, `-ignore-case`, `-novel-only`).
 
 Target sizing uses:
 

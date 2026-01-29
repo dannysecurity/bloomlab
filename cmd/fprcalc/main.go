@@ -15,13 +15,13 @@ func main() {
 	derive := flag.Bool("derive", false, "print step-by-step false-positive math")
 	flag.Parse()
 
-	bloomCfg, err := filter.Config()
+	fc, err := filter.FilterConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "fprcalc: %v\n", err)
 		os.Exit(1)
 	}
 
-	plan, err := bloom.PlanSizingFrom(bloomCfg)
+	plan, err := bloom.PlanSizingFromFilter(fc)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "fprcalc: %v\n", err)
 		os.Exit(1)
@@ -33,7 +33,7 @@ func main() {
 	}
 
 	inserts := *at
-	target, hasTarget := bloomCfg.Target()
+	target, hasTarget := fc.Target()
 	if inserts == 0 && hasTarget {
 		inserts = target.Capacity
 	}

@@ -24,13 +24,13 @@ func main() {
 	markdown := flag.Bool("markdown", false, "emit markdown table instead of plain text")
 	flag.Parse()
 
-	bloomCfg, err := filter.Config()
+	fc, err := filter.FilterConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "benchcompare: %v\n", err)
 		os.Exit(1)
 	}
 
-	cfg := benchcompare.NewConfig(bloomCfg)
+	cfg := benchcompare.NewConfig(fc)
 	cfg.LookupRepeats = *repeats
 	cfg.LookupHitRatio = *hitRatio
 

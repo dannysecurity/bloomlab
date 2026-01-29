@@ -96,13 +96,23 @@ func CompareSeeds(strategy Strategy, opts TuneOptions, seeds []uint64) []SeedCan
 
 // TuneOptionsFromConfig builds spread-measurement options from a resolved filter config.
 func TuneOptionsFromConfig(cfg Config, samples int, keyPrefix string) (TuneOptions, error) {
-	return TuneOptionsFromConfigWithDist(cfg, samples, keyPrefix, KeySequential, nil)
+	return TuneOptionsFromFilter(cfg.FilterConfig(), samples, keyPrefix)
+}
+
+// TuneOptionsFromFilter builds spread-measurement options from structured filter config.
+func TuneOptionsFromFilter(fc FilterConfig, samples int, keyPrefix string) (TuneOptions, error) {
+	return TuneOptionsFromFilterWithDist(fc, samples, keyPrefix, KeySequential, nil)
 }
 
 // TuneOptionsFromConfigWithDist builds spread-measurement options with a key distribution.
 // When dist is KeyFromSamples, sampleKeys must be non-empty.
 func TuneOptionsFromConfigWithDist(cfg Config, samples int, keyPrefix string, dist KeyDistribution, sampleKeys [][]byte) (TuneOptions, error) {
-	m, k, err := cfg.Size()
+	return TuneOptionsFromFilterWithDist(cfg.FilterConfig(), samples, keyPrefix, dist, sampleKeys)
+}
+
+// TuneOptionsFromFilterWithDist builds spread-measurement options from structured filter config.
+func TuneOptionsFromFilterWithDist(fc FilterConfig, samples int, keyPrefix string, dist KeyDistribution, sampleKeys [][]byte) (TuneOptions, error) {
+	m, k, err := fc.Size()
 	if err != nil {
 		return TuneOptions{}, err
 	}

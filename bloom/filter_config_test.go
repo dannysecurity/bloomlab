@@ -233,3 +233,30 @@ func TestFilterConfigImmutableApply(t *testing.T) {
 		t.Fatalf("Apply result = %+v", updated.Hash)
 	}
 }
+
+func TestFilterConfigTargetAccessors(t *testing.T) {
+	fc := TargetFilter(5000, 0.01, WithFilterHash(HashMurmur3))
+	spec, ok := fc.Target()
+	if !ok || spec.Capacity != 5000 || spec.FPR != 0.01 {
+		t.Fatalf("Target() = %+v, ok=%v", spec, ok)
+	}
+	if _, ok := fc.Explicit(); ok {
+		t.Fatal("Explicit() should be false for target sizing")
+	}
+	if fc.ExpectedCapacity() != 5000 || fc.FalsePositiveRate() != 0.01 {
+		t.Fatalf("ExpectedCapacity()=%d FalsePositiveRate()=%g", fc.ExpectedCapacity(), fc.FalsePositiveRate())
+	}
+
+	explicit := ExplicitFilter(256, 4)
+	if explicit.ExpectedCapacity() != 256 || explicit.FalsePositiveRate() != 0 {
+		t.Fatalf("explicit accessors = n=%d p=%g", explicit.ExpectedCapacity(), explicit.FalsePositiveRate())
+	}
+
+	updated := fc.WithFalsePositiveRate(0.001).WithExpectedCapacity(8000).WithHashStrategy(HashXXHash)
+	if updated.FalsePositiveRate() != 0.001 || updated.ExpectedCapacity() != 8000 || updated.Hash.Strategy != HashXXHash {
+		t.Fatalf("copy helpers = %+v hash=%v", updated.Sizing.Target, updated.Hash.Strategy)
+	}
+	if fc.FalsePositiveRate() != 0.01 || fc.Hash.Strategy != HashMurmur3 {
+		t.Fatal("copy helpers mutated original config")
+	}
+}

@@ -23,7 +23,7 @@ func main() {
 	markdown := flag.Bool("markdown", false, "emit markdown table instead of plain text")
 	flag.Parse()
 
-	bloomCfg, err := filter.Config()
+	fc, err := filter.FilterConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "hashtune: %v\n", err)
 		os.Exit(1)
@@ -45,7 +45,7 @@ func main() {
 		dist = bloom.KeyFromSamples
 	}
 
-	opts, err := bloom.TuneOptionsFromConfigWithDist(bloomCfg, *samples, *keyPrefix, dist, sampleKeys)
+	opts, err := bloom.TuneOptionsFromFilterWithDist(fc, *samples, *keyPrefix, dist, sampleKeys)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "hashtune: %v\n", err)
 		os.Exit(1)
