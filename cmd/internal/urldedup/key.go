@@ -9,7 +9,7 @@ func Key(line string, opts Options) (key string, ok bool) {
 		return "", false
 	}
 
-	needParse := opts.Normalize || opts.StripQuery || opts.StripTracking || opts.DomainOnly
+	needParse := opts.Normalize || opts.StripQuery || opts.StripTracking || opts.StripFragment || opts.DomainOnly
 	if !needParse {
 		return line, true
 	}
@@ -33,6 +33,10 @@ func Key(line string, opts Options) (key string, ok bool) {
 	if opts.StripQuery {
 		u.RawQuery = ""
 		u.ForceQuery = false
+	}
+
+	if opts.StripFragment {
+		u.Fragment = ""
 	}
 
 	if opts.DomainOnly {

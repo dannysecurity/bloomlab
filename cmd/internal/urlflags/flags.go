@@ -12,6 +12,7 @@ type Flags struct {
 	Normalize     *bool
 	StripQuery    *bool
 	StripTracking *bool
+	StripFragment *bool
 	DomainOnly    *bool
 }
 
@@ -21,6 +22,7 @@ func Register() *Flags {
 		Normalize:     flag.Bool("normalize", false, "canonicalize URLs (scheme/host case, default ports, trailing slashes, fragments)"),
 		StripQuery:    flag.Bool("strip-query", false, "ignore query strings when deduplicating"),
 		StripTracking: flag.Bool("strip-tracking", false, "drop common marketing/click-tracking query parameters (utm_*, fbclid, gclid, etc.)"),
+		StripFragment: flag.Bool("strip-fragment", false, "ignore URL fragments (#...) when deduplicating"),
 		DomainOnly:    flag.Bool("domain-only", false, "deduplicate by host name only, ignoring path and query"),
 	}
 }
@@ -31,6 +33,7 @@ func (f *Flags) Options() urldedup.Options {
 		Normalize:     *f.Normalize,
 		StripQuery:    *f.StripQuery,
 		StripTracking: *f.StripTracking,
+		StripFragment: *f.StripFragment,
 		DomainOnly:    *f.DomainOnly,
 	}
 }

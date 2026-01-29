@@ -237,9 +237,10 @@ printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/
 printf '%s\n' 'https://Example.com/' 'http://example.com:80' | go run ./cmd/urldedup -normalize
 printf '%s\n' 'https://a.test' 'https://a.test' | go run ./cmd/urldedup -json
 
-# Strip query strings, tracking params, or dedupe by host only
+# Strip query strings, tracking params, fragments, or dedupe by host only
 printf '%s\n' 'https://a.test/x?a=1' 'https://a.test/x?b=2' | go run ./cmd/urldedup -normalize -strip-query
 printf '%s\n' 'https://a.test/p?utm_source=x&id=1' 'https://a.test/p?fbclid=y&id=1' | go run ./cmd/urldedup -normalize -strip-tracking
+printf '%s\n' 'https://a.test/page#one' 'https://a.test/page#two' | go run ./cmd/urldedup -strip-fragment
 printf '%s\n' 'https://a.test/one' 'https://a.test/two' | go run ./cmd/urldedup -normalize -domain-only
 
 # Counting URL stream deduper — canonicalize URLs and allow removable keys (prefix lines with -)

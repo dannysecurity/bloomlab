@@ -106,6 +106,26 @@ func TestKeyDomainOnlyUnparseable(t *testing.T) {
 	}
 }
 
+func TestKeyStripFragment(t *testing.T) {
+	opts := Options{StripFragment: true}
+
+	first, ok := Key("https://a.test/page#section-one", opts)
+	if !ok || first != "https://a.test/page" {
+		t.Fatalf("Key() = %q, ok=%v; want https://a.test/page, true", first, ok)
+	}
+
+	second, ok := Key("https://a.test/page#section-two", opts)
+	if !ok || second != first {
+		t.Fatalf("different fragments should match: got %q want %q", second, first)
+	}
+
+	// Without -strip-fragment, fragments are preserved.
+	raw, ok := Key("https://a.test/page#section-one", Options{})
+	if !ok || raw != "https://a.test/page#section-one" {
+		t.Fatalf("Key() without strip-fragment = %q, ok=%v", raw, ok)
+	}
+}
+
 func TestKeyCombinedStripTrackingAndQuery(t *testing.T) {
 	opts := Options{Normalize: true, StripTracking: true, StripQuery: true}
 

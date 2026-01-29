@@ -10,6 +10,9 @@ type Options struct {
 	// StripTracking removes common marketing/click-tracking query parameters
 	// (utm_*, fbclid, gclid, etc.) while preserving other query keys.
 	StripTracking bool
+	// StripFragment removes the URL fragment (#...) before deduplication without
+	// applying other canonicalization rules.
+	StripFragment bool
 	// DomainOnly deduplicates by host name only, ignoring path and query.
 	DomainOnly bool
 }

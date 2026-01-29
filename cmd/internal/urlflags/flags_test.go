@@ -13,12 +13,29 @@ func TestOptionsDefaults(t *testing.T) {
 	}
 
 	opts := f.Options()
-	if opts.Normalize || opts.StripQuery || opts.StripTracking || opts.DomainOnly {
+	if opts.Normalize || opts.StripQuery || opts.StripTracking || opts.StripFragment || opts.DomainOnly {
 		t.Fatalf("Options() = %+v, want all false", opts)
 	}
 	key, ok := f.KeyFunc()("https://example.com")
 	if !ok || key != "https://example.com" {
 		t.Fatalf("KeyFunc() = %q ok=%v, want https://example.com", key, ok)
+	}
+}
+
+func TestOptionsStripFragment(t *testing.T) {
+	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+	f := Register()
+	if err := flag.CommandLine.Parse([]string{"-strip-fragment"}); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := f.Options()
+	if !opts.StripFragment || opts.Normalize || opts.StripQuery || opts.StripTracking || opts.DomainOnly {
+		t.Fatalf("Options() = %+v, want strip-fragment only", opts)
+	}
+	key, ok := f.KeyFunc()("https://a.test/doc#intro")
+	if !ok || key != "https://a.test/doc" {
+		t.Fatalf("KeyFunc() = %q ok=%v, want https://a.test/doc", key, ok)
 	}
 }
 
