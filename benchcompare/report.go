@@ -306,5 +306,64 @@ func formatNotes(cmp Comparison) string {
 		}
 		notes += "counting bloom filter"
 	}
+	if cmp.KeyLength > 0 {
+		if notes != "" {
+			notes += "; "
+		}
+		notes += fmt.Sprintf("key len %d B", cmp.KeyLength)
+	}
 	return notes
+}
+
+// FormatKeyLengthSweep renders add-scenario comparisons across key byte lengths.
+func FormatKeyLengthSweep(cfg Config, lengths []int, results []Comparison) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Bloom filter vs hash set — key length sweep (n=%d, p=%.4f, add workload)\n\n",
+		cfg.Bloom.ExpectedCapacity(), cfg.Bloom.FalsePositiveRate())
+
+	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "KEY LEN\tBLOOM B/item\tHASHSET B/item\tSPACE\tBLOOM ns/op\tHASHSET ns/op\tSPEEDUP\tBLOOM allocs/op\tHASHSET allocs/op\tALLOCS")
+	for i, cmp := range results {
+		fmt.Fprintf(tw, "%d B\t%.1f\t%.1f\t%.1fx\t%.0f\t%.0f\t%.2fx\t%.2f\t%.2f\t%.1fx\n",
+			lengths[i],
+			cmp.Bloom.BytesPerItem,
+			cmp.HashSet.BytesPerItem,
+			cmp.SpaceRatio(),
+			cmp.Bloom.NsPerOp,
+			cmp.HashSet.NsPerOp,
+			cmp.SpeedRatio(),
+			cmp.Bloom.AllocsPerOp,
+			cmp.HashSet.AllocsPerOp,
+			cmp.AllocRatio(),
+		)
+	}
+	_ = tw.Flush()
+
+	b.WriteString("\nBloom footprint depends on n and p only; hash set stores full key bytes so space ratio rises with key length.\n")
+	return b.String()
+}
+
+// FormatKeyLengthSweepMarkdown renders the key length sweep as a markdown table.
+func FormatKeyLengthSweepMarkdown(cfg Config, lengths []int, results []Comparison) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Bloom filter vs hash set — key length sweep\n\n")
+	fmt.Fprintf(&b, "Add workload at `n=%d`, `p=%.4f` across key byte lengths.\n\n",
+		cfg.Bloom.ExpectedCapacity(), cfg.Bloom.FalsePositiveRate())
+	fmt.Fprintln(&b, "| Key length | Bloom B/item | Hash set B/item | Space ratio | Bloom ns/op | Hash set ns/op | Speedup | Bloom allocs/op | Hash set allocs/op | Alloc ratio |")
+	fmt.Fprintln(&b, "|------------|--------------|-----------------|-------------|-------------|----------------|---------|-----------------|--------------------|-------------|")
+	for i, cmp := range results {
+		fmt.Fprintf(&b, "| %d B | %.1f | %.1f | %.1fx | %.0f | %.0f | %.2fx | %.2f | %.2f | %.1fx |\n",
+			lengths[i],
+			cmp.Bloom.BytesPerItem,
+			cmp.HashSet.BytesPerItem,
+			cmp.SpaceRatio(),
+			cmp.Bloom.NsPerOp,
+			cmp.HashSet.NsPerOp,
+			cmp.SpeedRatio(),
+			cmp.Bloom.AllocsPerOp,
+			cmp.HashSet.AllocsPerOp,
+			cmp.AllocRatio(),
+		)
+	}
+	return b.String()
 }

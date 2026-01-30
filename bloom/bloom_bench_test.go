@@ -117,6 +117,61 @@ func BenchmarkMapSetContainsMiss(b *testing.B) {
 	}
 }
 
+const benchLongKeyLen = 256
+
+func benchLongKey(i int) []byte {
+	key := make([]byte, benchLongKeyLen)
+	base := fmt.Sprintf("key-%d", i)
+	copy(key, base)
+	for j := len(base); j < benchLongKeyLen; j++ {
+		key[j] = 'x'
+	}
+	return key
+}
+
+// Long-key benchmarks compare bloom filter vs hash set when keys are large byte
+// slices (e.g. URLs or content hashes). Bloom storage stays fixed; map keys grow.
+func BenchmarkFilterAddLongKey(b *testing.B) {
+	f, _ := New(100_000, 0.01)
+	key := make([]byte, benchLongKeyLen)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		base := fmt.Sprintf("key-%d", i)
+		copy(key, base)
+		for j := len(base); j < benchLongKeyLen; j++ {
+			key[j] = 'x'
+		}
+		f.Add(key)
+	}
+}
+
+func BenchmarkMapSetAddLongKey(b *testing.B) {
+	set := make(map[string]struct{}, 100_000)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		set[string(benchLongKey(i))] = struct{}{}
+	}
+}
+
+func BenchmarkFilterContainsHitLongKey(b *testing.B) {
+	f, _ := New(100_000, 0.01)
+	key := benchLongKey(42)
+	f.Add(key)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = f.Contains(key)
+	}
+}
+
+func BenchmarkMapSetContainsHitLongKey(b *testing.B) {
+	key := string(benchLongKey(42))
+	set := map[string]struct{}{key: {}}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = set[key]
+	}
+}
+
 // Dedup-stream benchmarks mirror the check-then-insert pattern used by streamdedup:
 // first half of keys are unique, second half repeats earlier keys.
 const benchStreamLen = 10_000

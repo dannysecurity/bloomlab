@@ -48,8 +48,10 @@ func compareScenario(cfg Config, sc Scenario) (Comparison, error) {
 }
 
 func compareAdd(cfg Config) (Comparison, error) {
-	keys := makeKeys(cfg.Bloom.ExpectedCapacity())
+	return compareAddWithKeys(cfg, makeKeys(cfg.Bloom.ExpectedCapacity()), 0)
+}
 
+func compareAddWithKeys(cfg Config, keys [][]byte, keyLen int) (Comparison, error) {
 	bloomStart := time.Now()
 	f, err := bloom.NewFilterFrom(cfg.Bloom)
 	if err != nil {
@@ -92,7 +94,8 @@ func compareAdd(cfg Config) (Comparison, error) {
 
 	nf := float64(n)
 	return Comparison{
-		Scenario: ScenarioAdd,
+		Scenario:  ScenarioAdd,
+		KeyLength: keyLen,
 		Bloom: BackendResult{
 			NsPerOp:      float64(bloomElapsed.Nanoseconds()) / nf,
 			BytesPerItem: bloomBytes / nf,
@@ -466,9 +469,30 @@ func compareRemove(cfg Config) (Comparison, error) {
 }
 
 func makeKeys(n uint64) [][]byte {
+	return makeKeysWithLength(n, 0)
+}
+
+// makeKeysWithLength builds n distinct keys. When keyLen is zero, keys use the
+// default short format ("key-0", "key-1", …). When keyLen is positive, each key
+// is padded to exactly keyLen bytes so hash set footprint scales with key size
+// while Bloom filter storage stays fixed.
+func makeKeysWithLength(n uint64, keyLen int) [][]byte {
 	keys := make([][]byte, n)
 	for i := range keys {
-		keys[i] = []byte(fmt.Sprintf("key-%d", i))
+		if keyLen <= 0 {
+			keys[i] = []byte(fmt.Sprintf("key-%d", i))
+			continue
+		}
+		base := fmt.Sprintf("key-%d", i)
+		if len(base) > keyLen {
+			panic(fmt.Sprintf("benchcompare: key length %d too short for key index %d", keyLen, i))
+		}
+		key := make([]byte, keyLen)
+		copy(key, base)
+		for j := len(base); j < keyLen; j++ {
+			key[j] = 'x'
+		}
+		keys[i] = key
 	}
 	return keys
 }

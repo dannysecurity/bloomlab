@@ -16,10 +16,12 @@ func main() {
 	sweepHash := flag.Bool("sweep-hash", false, "compare add workload across hash strategies instead of all scenarios")
 	sweepSize := flag.Bool("sweep-size", false, "compare add workload across item counts instead of all scenarios")
 	sweepMix := flag.Bool("sweep-mix", false, "compare mixed lookup workload across hit ratios instead of all scenarios")
+	sweepKeyLen := flag.Bool("sweep-keylen", false, "compare add workload across key byte lengths instead of all scenarios")
 	pValues := flag.String("p-values", "0.001,0.01,0.1", "comma-separated FPR targets for -sweep-fpr")
 	hashValues := flag.String("hash-values", "fnv,murmur3,xxhash,wyhash", "comma-separated hash strategies for -sweep-hash")
 	sizeValues := flag.String("size-values", "10000,50000,100000,500000", "comma-separated item counts for -sweep-size")
 	mixValues := flag.String("mix-values", "0,0.25,0.5,0.75,1", "comma-separated lookup hit ratios for -sweep-mix")
+	keyLenValues := flag.String("keylen-values", "16,64,256,1024", "comma-separated key byte lengths for -sweep-keylen")
 	hitRatio := flag.Float64("hit-ratio", 0.5, "fraction of lookup keys present for contains_mixed scenario")
 	markdown := flag.Bool("markdown", false, "emit markdown table instead of plain text")
 	flag.Parse()
@@ -33,6 +35,25 @@ func main() {
 	cfg := benchcompare.NewConfig(fc)
 	cfg.LookupRepeats = *repeats
 	cfg.LookupHitRatio = *hitRatio
+
+	if *sweepKeyLen {
+		lengths, err := benchcompare.ParseKeyLengths(*keyLenValues)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "benchcompare: %v\n", err)
+			os.Exit(1)
+		}
+		results, err := benchcompare.CompareKeyLengthSweep(cfg, lengths)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "benchcompare: %v\n", err)
+			os.Exit(1)
+		}
+		if *markdown {
+			fmt.Print(benchcompare.FormatKeyLengthSweepMarkdown(cfg, lengths, results))
+			return
+		}
+		fmt.Print(benchcompare.FormatKeyLengthSweep(cfg, lengths, results))
+		return
+	}
 
 	if *sweepMix {
 		ratios, err := benchcompare.ParseLookupMixRatios(*mixValues)

@@ -101,6 +101,17 @@ func BenchmarkCompareLookupMixSweep(b *testing.B) {
 	}
 }
 
+func BenchmarkCompareKeyLengthSweep(b *testing.B) {
+	cfg := smallBenchConfig()
+	lengths := []int{16, 64, 256}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := CompareKeyLengthSweep(cfg, lengths); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 // ReportMetrics emits custom bench metrics so `go test -bench=ReportMetrics`
 // can compare bloom vs hash set side by side without parsing table output.
 func BenchmarkReportMetrics(b *testing.B) {

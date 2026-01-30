@@ -298,6 +298,119 @@ func TestFormatLookupMixSweep(t *testing.T) {
 	}
 }
 
+func TestCompareKeyLengthSweep(t *testing.T) {
+	cfg := Config{Bloom: bloom.TargetFilter(500, 0.01), LookupRepeats: 1}
+	lengths := []int{16, 64, 256}
+	results, err := CompareKeyLengthSweep(cfg, lengths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != len(lengths) {
+		t.Fatalf("got %d sweep results, want %d", len(results), len(lengths))
+	}
+	prevSpace := 0.0
+	for i, cmp := range results {
+		if cmp.Scenario != ScenarioAdd {
+			t.Fatalf("sweep[%d]: scenario = %q, want add", i, cmp.Scenario)
+		}
+		if cmp.KeyLength != lengths[i] {
+			t.Fatalf("sweep[%d]: KeyLength = %d, want %d", i, cmp.KeyLength, lengths[i])
+		}
+		if cmp.Bloom.BytesPerItem <= 0 {
+			t.Fatalf("sweep[%d]: bloom bytes/item must be positive", i)
+		}
+		if cmp.HashSet.BytesPerItem <= 0 {
+			t.Fatalf("sweep[%d]: hash set bytes/item must be positive", i)
+		}
+		if i > 0 && cmp.SpaceRatio() <= prevSpace {
+			t.Fatalf("sweep[%d]: space ratio %.2f should rise with key length (prev %.2f)",
+				i, cmp.SpaceRatio(), prevSpace)
+		}
+		prevSpace = cmp.SpaceRatio()
+		firstBloom := results[0].Bloom.BytesPerItem
+		delta := cmp.Bloom.BytesPerItem - firstBloom
+		if delta < 0 {
+			delta = -delta
+		}
+		if delta/firstBloom > 0.05 {
+			t.Fatalf("sweep[%d]: bloom bytes/item %.1f drifted from first %.1f at fixed n/p",
+				i, cmp.Bloom.BytesPerItem, firstBloom)
+		}
+	}
+}
+
+func TestCompareKeyLengthSweepInvalidLength(t *testing.T) {
+	cfg := Config{Bloom: bloom.TargetFilter(100, 0.01)}
+	_, err := CompareKeyLengthSweep(cfg, []int{0, 16})
+	if err == nil {
+		t.Fatal("expected error for zero key length")
+	}
+	_, err = CompareKeyLengthSweep(cfg, []int{4})
+	if err == nil {
+		t.Fatal("expected error for key length too short for n")
+	}
+	_, err = CompareKeyLengthSweep(cfg, nil)
+	if err == nil {
+		t.Fatal("expected error for empty lengths")
+	}
+}
+
+func TestParseKeyLengths(t *testing.T) {
+	lengths, err := ParseKeyLengths("16, 64 ,256")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lengths) != 3 {
+		t.Fatalf("got %d lengths, want 3", len(lengths))
+	}
+	if lengths[1] != 64 {
+		t.Fatalf("lengths[1] = %d, want 64", lengths[1])
+	}
+	_, err = ParseKeyLengths("")
+	if err == nil {
+		t.Fatal("expected error for empty string")
+	}
+}
+
+func TestFormatKeyLengthSweep(t *testing.T) {
+	cfg := Config{Bloom: bloom.TargetFilter(500, 0.01), LookupRepeats: 1}
+	lengths := []int{16, 256}
+	results, err := CompareKeyLengthSweep(cfg, lengths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := FormatKeyLengthSweep(cfg, lengths, results)
+	if !strings.Contains(text, "key length sweep") {
+		t.Fatal("sweep report missing title")
+	}
+	if !strings.Contains(text, "256 B") {
+		t.Fatal("sweep report missing second length")
+	}
+	md := FormatKeyLengthSweepMarkdown(cfg, lengths, results)
+	if !strings.Contains(md, "| Key length |") {
+		t.Fatal("sweep markdown missing header")
+	}
+}
+
+func TestMakeKeysWithLength(t *testing.T) {
+	keys := makeKeysWithLength(10, 32)
+	if len(keys) != 10 {
+		t.Fatalf("got %d keys, want 10", len(keys))
+	}
+	for i, key := range keys {
+		if len(key) != 32 {
+			t.Fatalf("keys[%d] len = %d, want 32", i, len(key))
+		}
+	}
+	seen := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		if _, ok := seen[string(key)]; ok {
+			t.Fatal("duplicate key generated")
+		}
+		seen[string(key)] = struct{}{}
+	}
+}
+
 func TestMakeMixedLookupKeys(t *testing.T) {
 	keys := makeMixedLookupKeys(100, 0.5)
 	if len(keys) != 100 {

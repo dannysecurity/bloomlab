@@ -18,6 +18,8 @@ type Comparison struct {
 	HashSet  BackendResult
 	// LookupHitRatio records the hit fraction for ScenarioContainsMixed; zero otherwise.
 	LookupHitRatio float64
+	// KeyLength records the byte length of keys in key-length sweeps; zero otherwise.
+	KeyLength int
 }
 
 // SpeedRatio returns hash-set ns/op divided by bloom ns/op. Values above 1 mean

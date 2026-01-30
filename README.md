@@ -325,6 +325,10 @@ go run ./cmd/benchcompare -sweep-size -size-values 10000,100000,1000000 -p 0.01 
 go run ./cmd/benchcompare -sweep-mix -n 50000 -repeats 2
 go run ./cmd/benchcompare -sweep-mix -mix-values 0,0.25,0.5,0.75,1 -markdown
 
+# Sweep key byte lengths to see hash set footprint grow while Bloom stays fixed
+go run ./cmd/benchcompare -sweep-keylen -n 10000
+go run ./cmd/benchcompare -sweep-keylen -keylen-values 16,64,256,1024 -markdown
+
 # Markdown table for docs or CI artifacts
 go run ./cmd/benchcompare -markdown > docs/benchcompare.md
 ```
