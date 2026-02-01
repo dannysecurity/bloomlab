@@ -6,6 +6,7 @@ const (
 	counterMax8  = uint8(255)
 	counterMax16 = uint16(65535)
 	counterMax32 = uint32(4294967295)
+	counterMax64 = uint64(18446744073709551615)
 )
 
 type counterStore interface {
@@ -181,6 +182,60 @@ func (s counterStore32) bytesPerCounter() uint64 { return 4 }
 
 func (s counterStore32) limit() uint64 { return uint64(counterMax32) }
 
+type counterStore64 struct {
+	counters []uint64
+}
+
+func newCounterStore64(m uint64) counterStore64 {
+	return counterStore64{counters: make([]uint64, m)}
+}
+
+func (s counterStore64) at(idx uint64) uint64 { return s.counters[idx] }
+
+func (s counterStore64) inc(idx uint64) error {
+	if s.counters[idx] == counterMax64 {
+		return ErrCounterOverflow
+	}
+	s.counters[idx]++
+	return nil
+}
+
+func (s counterStore64) dec(idx uint64) {
+	if s.counters[idx] > 0 {
+		s.counters[idx]--
+	}
+}
+
+func (s counterStore64) clear() {
+	for i := range s.counters {
+		s.counters[i] = 0
+	}
+}
+
+func (s counterStore64) max() uint64 {
+	var max uint64
+	for _, c := range s.counters {
+		if c > max {
+			max = c
+		}
+	}
+	return max
+}
+
+func (s counterStore64) occupied() uint64 {
+	var occupied uint64
+	for _, c := range s.counters {
+		if c > 0 {
+			occupied++
+		}
+	}
+	return occupied
+}
+
+func (s counterStore64) bytesPerCounter() uint64 { return 8 }
+
+func (s counterStore64) limit() uint64 { return counterMax64 }
+
 func newCounterStore(m uint64, width uint8) (counterStore, error) {
 	switch width {
 	case 8:
@@ -189,6 +244,8 @@ func newCounterStore(m uint64, width uint8) (counterStore, error) {
 		return newCounterStore16(m), nil
 	case 32:
 		return newCounterStore32(m), nil
+	case 64:
+		return newCounterStore64(m), nil
 	default:
 		return nil, fmt.Errorf("%w: %d", ErrInvalidCounterWidth, width)
 	}

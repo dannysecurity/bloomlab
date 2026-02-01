@@ -140,7 +140,7 @@ type FilterConfig struct {
 // CountingConfig extends FilterConfig with per-bit counter width for counting filters.
 type CountingConfig struct {
 	Filter       FilterConfig
-	CounterWidth uint8 // 8 (default), 16, or 32
+	CounterWidth uint8 // 8 (default), 16, 32, or 64
 }
 
 // TargetFilter returns a FilterConfig that derives m and k from capacity and FPR.
@@ -256,7 +256,7 @@ func WithCountingSizingBounds(bounds SizingBounds) CountingOption {
 	}
 }
 
-// WithCountingCounterWidth selects per-bit counter width (8, 16, or 32).
+// WithCountingCounterWidth selects per-bit counter width (8, 16, 32, or 64).
 func WithCountingCounterWidth(width uint8) CountingOption {
 	return func(cc *CountingConfig) {
 		cc.CounterWidth = width
@@ -424,7 +424,7 @@ func (cc CountingConfig) resolvedCounterWidth() uint8 {
 
 func (cc CountingConfig) validateCounterWidth() error {
 	switch cc.resolvedCounterWidth() {
-	case 8, 16, 32:
+	case 8, 16, 32, 64:
 		return nil
 	default:
 		return ErrInvalidCounterWidth

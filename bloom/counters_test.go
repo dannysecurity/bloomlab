@@ -34,6 +34,13 @@ func TestCounterStoreWidths(t *testing.T) {
 			limit:         4294967295,
 			overflowAfter: 0,
 		},
+		{
+			name:          "64-bit",
+			width:         64,
+			bytesPer:      8,
+			limit:         18446744073709551615,
+			overflowAfter: 0,
+		},
 	}
 
 	for _, tt := range tests {

@@ -90,6 +90,12 @@ Use 32-bit counters for workloads with very high per-position reference counts:
 cf, _ := bloom.NewCountingFilterFrom(bloom.ExplicitCounting(1024, 4, bloom.WithCountingCounterWidth(32)))
 ```
 
+Use 64-bit counters when per-position counts may exceed 32-bit limits (e.g. long-lived reference-counted sets):
+
+```go
+cf, _ := bloom.NewCountingFilterFrom(bloom.ExplicitCounting(1024, 4, bloom.WithCountingCounterWidth(64)))
+```
+
 ## False positive rate
 
 A Bloom filter may report **maybe present** for keys that were never inserted. That **false positive rate (FPR)** is the probability `TargetConfig(n, p)` sizes for.
@@ -352,7 +358,7 @@ go test -bench=ReportMetrics ./benchcompare/
 | Type | Add | Contains | Remove | Notes |
 |------|-----|----------|--------|-------|
 | `Filter` | ✓ | ✓ | — | Classic bit-slice Bloom filter |
-| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters by default; `WithCounterWidth(16\|32)` for wider variants; overflow at counter max; `Clear`, `CounterBytes`, `CounterWidth`, `ApproximateCount`, `TheoryFPR`, `FillRatio` |
+| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters by default; `WithCounterWidth(16\|32\|64)` for wider variants; overflow at counter max; `Clear`, `CounterBytes`, `CounterWidth`, `ApproximateCount`, `TheoryFPR`, `FillRatio` |
 
 ### Configuration
 

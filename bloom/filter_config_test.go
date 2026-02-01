@@ -205,7 +205,7 @@ func TestBuildCountingConfig(t *testing.T) {
 		SizingExplicit,
 		TargetSpec{},
 		ExplicitSpec{Bits: 128, HashCount: 4},
-		WithCountingCounterWidth(64),
+		WithCountingCounterWidth(48),
 	); err != ErrInvalidCounterWidth {
 		t.Fatalf("invalid width = %v, want ErrInvalidCounterWidth", err)
 	}

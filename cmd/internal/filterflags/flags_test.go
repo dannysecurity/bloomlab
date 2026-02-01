@@ -142,7 +142,7 @@ func TestFlagsCountingConfigWideCounterWidth(t *testing.T) {
 func TestFlagsCountingConfigInvalidCounterWidth(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 	f := RegisterCounting(1000)
-	if err := flag.CommandLine.Parse([]string{"-counter-width", "64"}); err != nil {
+	if err := flag.CommandLine.Parse([]string{"-counter-width", "24"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -220,10 +220,20 @@ func TestFlagsConfigTable(t *testing.T) {
 			},
 		},
 		{
-			name:     "counting invalid counter width",
+			name:     "counting 64-bit counter",
 			counting: true,
 			args:     []string{"-counter-width", "64"},
-			wantErr:  "counter-width must be 8, 16, or 32",
+			check: func(t *testing.T, cfg bloom.Config) {
+				if cfg.CounterWidth != 64 {
+					t.Fatalf("CounterWidth = %d, want 64", cfg.CounterWidth)
+				}
+			},
+		},
+		{
+			name:     "counting invalid counter width",
+			counting: true,
+			args:     []string{"-counter-width", "24"},
+			wantErr:  "counter-width must be 8, 16, 32, or 64",
 		},
 	}
 
