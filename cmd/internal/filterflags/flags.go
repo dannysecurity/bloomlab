@@ -53,10 +53,10 @@ func (f *Flags) FilterConfig() (bloom.FilterConfig, error) {
 	}
 
 	if *f.Bits != 0 {
-		fc, err := bloom.BuildFilterConfig(bloom.SizingExplicit, bloom.TargetSpec{}, bloom.ExplicitSpec{
-			Bits:      *f.Bits,
-			HashCount: uint(*f.HashCount),
-		}, bloom.WithFilterHashConfig(hash))
+		fc, err := bloom.BuildFilterFromSizing(
+			bloom.ExplicitSizing(*f.Bits, uint(*f.HashCount)),
+			bloom.WithFilterHashConfig(hash),
+		)
 		if err != nil {
 			return bloom.FilterConfig{}, err
 		}
@@ -66,14 +66,13 @@ func (f *Flags) FilterConfig() (bloom.FilterConfig, error) {
 		return bloom.FilterConfig{}, fmt.Errorf("explicit sizing requires -m (bit count); -k without -m is invalid")
 	}
 
-	fc, err := bloom.BuildFilterConfig(bloom.SizingTarget, bloom.TargetSpec{
-		Capacity: *f.Capacity,
-		FPR:      *f.FPR,
-		Bounds: bloom.SizingBounds{
+	fc, err := bloom.BuildFilterFromSizing(
+		bloom.TargetSizing(*f.Capacity, *f.FPR, bloom.SizingBounds{
 			MinBits:      *f.MinBits,
 			MaxHashCount: uint(*f.MaxHashCount),
-		},
-	}, bloom.ExplicitSpec{}, bloom.WithFilterHashConfig(hash))
+		}),
+		bloom.WithFilterHashConfig(hash),
+	)
 	if err != nil {
 		return bloom.FilterConfig{}, err
 	}

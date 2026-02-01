@@ -145,6 +145,42 @@ func TestConfigFromTypedSpecs(t *testing.T) {
 	}
 }
 
+func TestBuildConfigFromSizing(t *testing.T) {
+	cfg, err := BuildConfigFromSizing(TargetSizing(1000, 0.01, SizingBounds{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Mode() != SizingTarget {
+		t.Fatalf("Mode() = %v, want target", cfg.Mode())
+	}
+
+	cfg, err = BuildConfigFromSizing(ExplicitSizing(256, 4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Mode() != SizingExplicit {
+		t.Fatalf("Mode() = %v, want explicit", cfg.Mode())
+	}
+
+	if _, err := BuildConfigFromSizing(TargetSizing(0, 0.01, SizingBounds{})); err != ErrInvalidCapacity {
+		t.Fatalf("BuildConfigFromSizing zero capacity = %v, want ErrInvalidCapacity", err)
+	}
+	if _, err := BuildConfigFromSizing(ExplicitSizing(0, 4)); err != ErrInvalidBits {
+		t.Fatalf("BuildConfigFromSizing incomplete explicit = %v, want ErrInvalidBits", err)
+	}
+}
+
+func TestConfigFromSizing(t *testing.T) {
+	cfg := ConfigFromSizing(TargetSizing(5000, 0.02, SizingBounds{MinBits: 128}), WithHash(HashMurmur3))
+	got, ok := cfg.Target()
+	if !ok || got.Capacity != 5000 || got.FPR != 0.02 || got.Bounds.MinBits != 128 {
+		t.Fatalf("Target() = %+v ok=%v", got, ok)
+	}
+	if cfg.Hash.Strategy != HashMurmur3 {
+		t.Fatalf("Hash = %+v, want murmur3", cfg.Hash)
+	}
+}
+
 func TestBuildConfig(t *testing.T) {
 	cfg, err := BuildConfig(SizingTarget, TargetSpec{Capacity: 1000, FPR: 0.01}, ExplicitSpec{})
 	if err != nil {

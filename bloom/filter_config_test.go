@@ -69,6 +69,63 @@ func TestSizingConfigSize(t *testing.T) {
 	}
 }
 
+func TestBuildFilterFromSizing(t *testing.T) {
+	fc, err := BuildFilterFromSizing(TargetSizing(1000, 0.01, SizingBounds{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fc.Mode() != SizingTarget {
+		t.Fatalf("Mode() = %v, want target", fc.Mode())
+	}
+
+	fc, err = BuildFilterFromSizing(ExplicitSizing(256, 4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fc.Mode() != SizingExplicit {
+		t.Fatalf("Mode() = %v, want explicit", fc.Mode())
+	}
+
+	if _, err := BuildFilterFromSizing(TargetSizing(0, 0.01, SizingBounds{})); err != ErrInvalidCapacity {
+		t.Fatalf("BuildFilterFromSizing zero capacity = %v, want ErrInvalidCapacity", err)
+	}
+	if _, err := BuildFilterFromSizing(ExplicitSizing(0, 4)); err != ErrInvalidBits {
+		t.Fatalf("BuildFilterFromSizing incomplete explicit = %v, want ErrInvalidBits", err)
+	}
+}
+
+func TestFilterFromSizing(t *testing.T) {
+	fc := FilterFromSizing(TargetSizing(5000, 0.02, SizingBounds{MinBits: 256}),
+		WithFilterHash(HashMurmur3), WithFilterSeed(3))
+	spec, ok := fc.Target()
+	if !ok || spec.Capacity != 5000 || spec.FPR != 0.02 || spec.Bounds.MinBits != 256 {
+		t.Fatalf("Target() = %+v ok=%v", spec, ok)
+	}
+	if fc.Hash.Strategy != HashMurmur3 || fc.Hash.Seed != 3 {
+		t.Fatalf("Hash = %+v, want murmur3 seed=3", fc.Hash)
+	}
+}
+
+func TestBuildCountingFromSizing(t *testing.T) {
+	cc, err := BuildCountingFromSizing(
+		ExplicitSizing(128, 4),
+		WithCountingCounterWidth(16),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cc.CounterWidth != 16 {
+		t.Fatalf("CounterWidth = %d, want 16", cc.CounterWidth)
+	}
+
+	if _, err := BuildCountingFromSizing(
+		ExplicitSizing(128, 4),
+		WithCountingCounterWidth(48),
+	); err != ErrInvalidCounterWidth {
+		t.Fatalf("invalid width = %v, want ErrInvalidCounterWidth", err)
+	}
+}
+
 func TestBuildFilterConfig(t *testing.T) {
 	fc, err := BuildFilterConfig(SizingTarget, TargetSpec{Capacity: 1000, FPR: 0.01}, ExplicitSpec{})
 	if err != nil {

@@ -112,29 +112,41 @@ func ConfigFromExplicit(spec ExplicitSpec, opts ...ConfigOption) Config {
 	return cfg
 }
 
-// BuildConfig constructs and validates a Config from typed sizing specs.
-// For SizingTarget, supply target and leave explicit zero-valued.
-// For SizingExplicit, supply explicit and leave target zero-valued.
-func BuildConfig(mode SizingMode, target TargetSpec, explicit ExplicitSpec, opts ...ConfigOption) (Config, error) {
-	var cfg Config
-	switch mode {
+// ConfigFromSizing builds a Config from a SizingConfig without validating inputs.
+// Prefer BuildConfigFromSizing when validation before construction is required.
+func ConfigFromSizing(sizing SizingConfig, opts ...ConfigOption) Config {
+	switch sizing.Mode {
 	case SizingTarget:
-		if err := target.Validate(); err != nil {
-			return Config{}, err
-		}
-		cfg = ConfigFromTarget(target, opts...)
+		return ConfigFromTarget(sizing.Target, opts...)
 	case SizingExplicit:
-		if err := explicit.Validate(); err != nil {
-			return Config{}, err
-		}
-		cfg = ConfigFromExplicit(explicit, opts...)
+		return ConfigFromExplicit(sizing.Explicit, opts...)
 	default:
-		return Config{}, fmt.Errorf("bloom: unknown sizing mode %v", mode)
+		return Config{}
 	}
+}
+
+// BuildConfigFromSizing validates sizing and returns a Config.
+func BuildConfigFromSizing(sizing SizingConfig, opts ...ConfigOption) (Config, error) {
+	if err := sizing.Validate(); err != nil {
+		return Config{}, err
+	}
+	cfg := ConfigFromSizing(sizing, opts...)
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// BuildConfig constructs and validates a Config from typed sizing specs.
+// For SizingTarget, supply target and leave explicit zero-valued.
+// For SizingExplicit, supply explicit and leave target zero-valued.
+// Prefer BuildConfigFromSizing with TargetSizing or ExplicitSizing for clearer call sites.
+func BuildConfig(mode SizingMode, target TargetSpec, explicit ExplicitSpec, opts ...ConfigOption) (Config, error) {
+	return BuildConfigFromSizing(SizingConfig{
+		Mode:     mode,
+		Target:   target,
+		Explicit: explicit,
+	}, opts...)
 }
 
 // Mode reports whether the configuration uses target or explicit sizing.

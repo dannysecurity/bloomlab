@@ -174,27 +174,34 @@ func FilterFromExplicit(spec ExplicitSpec, opts ...FilterOption) FilterConfig {
 	return fc
 }
 
-// BuildFilterConfig constructs and validates a FilterConfig from typed sizing specs.
-func BuildFilterConfig(mode SizingMode, target TargetSpec, explicit ExplicitSpec, opts ...FilterOption) (FilterConfig, error) {
-	var fc FilterConfig
-	switch mode {
-	case SizingTarget:
-		if err := target.Validate(); err != nil {
-			return FilterConfig{}, err
-		}
-		fc = FilterFromTarget(target, opts...)
-	case SizingExplicit:
-		if err := explicit.Validate(); err != nil {
-			return FilterConfig{}, err
-		}
-		fc = FilterFromExplicit(explicit, opts...)
-	default:
-		return FilterConfig{}, fmt.Errorf("bloom: unknown sizing mode %v", mode)
+// FilterFromSizing builds a FilterConfig from a SizingConfig without validating inputs.
+// Prefer BuildFilterFromSizing when validation before construction is required.
+func FilterFromSizing(sizing SizingConfig, opts ...FilterOption) FilterConfig {
+	fc := FilterConfig{Sizing: sizing}
+	applyFilterOptions(&fc, opts)
+	return fc
+}
+
+// BuildFilterFromSizing validates sizing and returns a FilterConfig.
+func BuildFilterFromSizing(sizing SizingConfig, opts ...FilterOption) (FilterConfig, error) {
+	if err := sizing.Validate(); err != nil {
+		return FilterConfig{}, err
 	}
+	fc := FilterFromSizing(sizing, opts...)
 	if err := fc.Validate(); err != nil {
 		return FilterConfig{}, err
 	}
 	return fc, nil
+}
+
+// BuildFilterConfig constructs and validates a FilterConfig from typed sizing specs.
+// Prefer BuildFilterFromSizing with TargetSizing or ExplicitSizing for clearer call sites.
+func BuildFilterConfig(mode SizingMode, target TargetSpec, explicit ExplicitSpec, opts ...FilterOption) (FilterConfig, error) {
+	return BuildFilterFromSizing(SizingConfig{
+		Mode:     mode,
+		Target:   target,
+		Explicit: explicit,
+	}, opts...)
 }
 
 // TargetCounting returns a CountingConfig sized from capacity and FPR.
@@ -211,9 +218,9 @@ func ExplicitCounting(bits uint64, hashCount uint, opts ...CountingOption) Count
 	return cc
 }
 
-// BuildCountingConfig validates sizing and counter width, returning a CountingConfig.
-func BuildCountingConfig(mode SizingMode, target TargetSpec, explicit ExplicitSpec, opts ...CountingOption) (CountingConfig, error) {
-	fc, err := BuildFilterConfig(mode, target, explicit)
+// BuildCountingFromSizing validates sizing and counter width, returning a CountingConfig.
+func BuildCountingFromSizing(sizing SizingConfig, opts ...CountingOption) (CountingConfig, error) {
+	fc, err := BuildFilterFromSizing(sizing)
 	if err != nil {
 		return CountingConfig{}, err
 	}
@@ -223,6 +230,16 @@ func BuildCountingConfig(mode SizingMode, target TargetSpec, explicit ExplicitSp
 		return CountingConfig{}, err
 	}
 	return cc, nil
+}
+
+// BuildCountingConfig validates sizing and counter width, returning a CountingConfig.
+// Prefer BuildCountingFromSizing with TargetSizing or ExplicitSizing for clearer call sites.
+func BuildCountingConfig(mode SizingMode, target TargetSpec, explicit ExplicitSpec, opts ...CountingOption) (CountingConfig, error) {
+	return BuildCountingFromSizing(SizingConfig{
+		Mode:     mode,
+		Target:   target,
+		Explicit: explicit,
+	}, opts...)
 }
 
 // CountingOption customizes a CountingConfig.
