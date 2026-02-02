@@ -19,6 +19,11 @@ func main() {
 	removePrefix := flag.String("remove-prefix", "-", "lines with this prefix remove the remainder from the set instead of classifying")
 	flag.Parse()
 
+	if err := stream.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "countingurldedup: %v\n", err)
+		os.Exit(2)
+	}
+
 	cc, err := flags.CountingConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "countingurldedup: %v\n", err)

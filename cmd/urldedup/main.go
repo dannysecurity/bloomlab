@@ -18,6 +18,11 @@ func main() {
 	url := urlflags.Register()
 	flag.Parse()
 
+	if err := stream.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "urldedup: %v\n", err)
+		os.Exit(2)
+	}
+
 	fc, err := flags.FilterConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "urldedup: %v\n", err)

@@ -132,6 +132,24 @@ func TestRunNovelOnly(t *testing.T) {
 	}
 }
 
+func TestRunDupOnly(t *testing.T) {
+	d := New(testFilter(t), nil)
+	var out, errOut bytes.Buffer
+	in := strings.NewReader("a\nb\na\nc\na\n")
+
+	if err := Run(d, in, RunOptions{DupOnly: true, Out: &out, ErrOut: &errOut}); err != nil {
+		t.Fatal(err)
+	}
+
+	wantOut := "dup\ta\ndup\ta\n"
+	if out.String() != wantOut {
+		t.Fatalf("stdout:\n%s\nwant:\n%s", out.String(), wantOut)
+	}
+	if !strings.Contains(errOut.String(), "novel: 3, duplicates: 2") {
+		t.Fatalf("stderr summary: %q", errOut.String())
+	}
+}
+
 type ioDiscard struct{}
 
 func (ioDiscard) Write(p []byte) (int, error) { return len(p), nil }

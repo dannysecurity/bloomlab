@@ -16,6 +16,11 @@ func main() {
 	stream := streamflags.Register()
 	flag.Parse()
 
+	if err := stream.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "streamdedup: %v\n", err)
+		os.Exit(2)
+	}
+
 	fc, err := flags.FilterConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "streamdedup: %v\n", err)

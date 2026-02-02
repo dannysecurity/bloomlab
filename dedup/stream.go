@@ -21,6 +21,7 @@ const (
 type RunOptions struct {
 	Quiet     bool
 	NovelOnly bool // emit first-seen lines only; skip duplicates
+	DupOnly   bool // emit duplicate lines only; skip first-seen
 	Format    Format
 	Out       io.Writer
 	ErrOut    io.Writer
@@ -52,7 +53,7 @@ func Run(c *Classifier, in io.Reader, opts RunOptions) error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		isDup, ok := c.Classify(line)
-		if !ok || opts.Quiet || (opts.NovelOnly && isDup) {
+		if !ok || opts.Quiet || skipClassifyOutput(opts, isDup) {
 			continue
 		}
 		if err := writeClassifyResult(out, opts.Format, isDup, line); err != nil {
@@ -96,7 +97,7 @@ func RunCounting(c *CountingClassifier, in io.Reader, opts CountingRunOptions) e
 		if err != nil {
 			return fmt.Errorf("classify %q: %w", line, err)
 		}
-		if !ok || opts.Quiet || (opts.NovelOnly && isDup) {
+		if !ok || opts.Quiet || skipClassifyOutput(opts.RunOptions, isDup) {
 			continue
 		}
 		if err := writeClassifyResult(out, opts.Format, isDup, line); err != nil {
@@ -108,6 +109,16 @@ func RunCounting(c *CountingClassifier, in io.Reader, opts CountingRunOptions) e
 	}
 	writeCountingSummary(opts.errOut(), c)
 	return nil
+}
+
+func skipClassifyOutput(opts RunOptions, duplicate bool) bool {
+	if opts.NovelOnly && duplicate {
+		return true
+	}
+	if opts.DupOnly && !duplicate {
+		return true
+	}
+	return false
 }
 
 func writeClassifyResult(w io.Writer, format Format, duplicate bool, line string) error {
