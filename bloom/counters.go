@@ -3,6 +3,7 @@ package bloom
 import "fmt"
 
 const (
+	counterMax4  = uint8(15)
 	counterMax8  = uint8(255)
 	counterMax16 = uint16(65535)
 	counterMax32 = uint32(4294967295)
@@ -17,6 +18,7 @@ type counterStore interface {
 	max() uint64
 	occupied() uint64
 	bytesPerCounter() uint64
+	storageBytes() uint64
 	limit() uint64
 }
 
@@ -72,7 +74,89 @@ func (s counterStore8) occupied() uint64 {
 
 func (s counterStore8) bytesPerCounter() uint64 { return 1 }
 
+func (s counterStore8) storageBytes() uint64 { return uint64(len(s.counters)) }
+
 func (s counterStore8) limit() uint64 { return uint64(counterMax8) }
+
+type counterStore4 struct {
+	m    uint64
+	data []byte // two 4-bit counters per byte
+}
+
+func newCounterStore4(m uint64) counterStore4 {
+	return counterStore4{m: m, data: make([]byte, (m+1)/2)}
+}
+
+func nibbleSlot(idx uint64) (byteIdx uint64, high bool) {
+	return idx / 2, idx%2 == 0
+}
+
+func (s counterStore4) readNibble(idx uint64) uint8 {
+	byteIdx, high := nibbleSlot(idx)
+	if high {
+		return s.data[byteIdx] >> 4
+	}
+	return s.data[byteIdx] & 0x0f
+}
+
+func (s counterStore4) writeNibble(idx uint64, val uint8) {
+	byteIdx, high := nibbleSlot(idx)
+	if high {
+		s.data[byteIdx] = (s.data[byteIdx] & 0x0f) | (val << 4)
+		return
+	}
+	s.data[byteIdx] = (s.data[byteIdx] & 0xf0) | val
+}
+
+func (s counterStore4) at(idx uint64) uint64 { return uint64(s.readNibble(idx)) }
+
+func (s counterStore4) inc(idx uint64) error {
+	v := s.readNibble(idx)
+	if v == counterMax4 {
+		return ErrCounterOverflow
+	}
+	s.writeNibble(idx, v+1)
+	return nil
+}
+
+func (s counterStore4) dec(idx uint64) {
+	v := s.readNibble(idx)
+	if v > 0 {
+		s.writeNibble(idx, v-1)
+	}
+}
+
+func (s counterStore4) clear() {
+	for i := range s.data {
+		s.data[i] = 0
+	}
+}
+
+func (s counterStore4) max() uint64 {
+	var max uint64
+	for idx := uint64(0); idx < s.m; idx++ {
+		if v := uint64(s.readNibble(idx)); v > max {
+			max = v
+		}
+	}
+	return max
+}
+
+func (s counterStore4) occupied() uint64 {
+	var occupied uint64
+	for idx := uint64(0); idx < s.m; idx++ {
+		if s.readNibble(idx) > 0 {
+			occupied++
+		}
+	}
+	return occupied
+}
+
+func (s counterStore4) bytesPerCounter() uint64 { return 0 }
+
+func (s counterStore4) storageBytes() uint64 { return uint64(len(s.data)) }
+
+func (s counterStore4) limit() uint64 { return uint64(counterMax4) }
 
 type counterStore16 struct {
 	counters []uint16
@@ -125,6 +209,8 @@ func (s counterStore16) occupied() uint64 {
 }
 
 func (s counterStore16) bytesPerCounter() uint64 { return 2 }
+
+func (s counterStore16) storageBytes() uint64 { return uint64(len(s.counters)) * 2 }
 
 func (s counterStore16) limit() uint64 { return uint64(counterMax16) }
 
@@ -180,6 +266,8 @@ func (s counterStore32) occupied() uint64 {
 
 func (s counterStore32) bytesPerCounter() uint64 { return 4 }
 
+func (s counterStore32) storageBytes() uint64 { return uint64(len(s.counters)) * 4 }
+
 func (s counterStore32) limit() uint64 { return uint64(counterMax32) }
 
 type counterStore64 struct {
@@ -234,10 +322,14 @@ func (s counterStore64) occupied() uint64 {
 
 func (s counterStore64) bytesPerCounter() uint64 { return 8 }
 
+func (s counterStore64) storageBytes() uint64 { return uint64(len(s.counters)) * 8 }
+
 func (s counterStore64) limit() uint64 { return counterMax64 }
 
 func newCounterStore(m uint64, width uint8) (counterStore, error) {
 	switch width {
+	case 4:
+		return newCounterStore4(m), nil
 	case 8:
 		return newCounterStore8(m), nil
 	case 16:

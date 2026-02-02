@@ -10,7 +10,7 @@ var (
 	ErrInvalidCapacity    = errors.New("bloom: capacity must be positive")
 	ErrInvalidFPR         = errors.New("bloom: false positive rate must be in (0, 1)")
 	ErrInvalidBits        = errors.New("bloom: bit count must be positive")
-	ErrInvalidCounterWidth = errors.New("bloom: counter width must be 8, 16, 32, or 64")
+	ErrInvalidCounterWidth = errors.New("bloom: counter width must be 4, 8, 16, 32, or 64")
 )
 
 const (
@@ -101,7 +101,7 @@ func WithSizingBounds(bounds SizingBounds) ConfigOption {
 	}
 }
 
-// WithCounterWidth selects per-bit counter width for counting filters.
+// WithCounterWidth selects per-bit counter width for counting filters (4, 8, 16, 32, or 64).
 // Supported values are 8 (default), 16, 32, and 64. Wider counters use more memory
 // but tolerate more duplicate inserts before ErrCounterOverflow.
 func WithCounterWidth(width uint8) ConfigOption {
@@ -132,7 +132,7 @@ type Config struct {
 	MinBits      uint64
 	MaxHashCount uint
 
-	// CounterWidth selects uint8 (0 or 8), uint16 (16), uint32 (32), or uint64 (64) counters for counting filters.
+	// CounterWidth selects packed 4-bit (4), uint8 (0 or 8), uint16 (16), uint32 (32), or uint64 (64) counters.
 	CounterWidth uint8
 
 	Hash HashConfig
@@ -265,7 +265,7 @@ func (c Config) WithSizingBounds(bounds SizingBounds) Config {
 	return c
 }
 
-// WithCounterWidth returns a copy with the given per-bit counter width (8, 16, 32, or 64).
+// WithCounterWidth returns a copy with the given per-bit counter width (4, 8, 16, 32, or 64).
 func (c Config) WithCounterWidth(width uint8) Config {
 	c.CounterWidth = width
 	return c
@@ -350,7 +350,7 @@ func (c Config) resolvedCounterWidth() uint8 {
 
 func (c Config) validateCounterWidth() error {
 	switch c.resolvedCounterWidth() {
-	case 8, 16, 32, 64:
+	case 4, 8, 16, 32, 64:
 		return nil
 	default:
 		return ErrInvalidCounterWidth

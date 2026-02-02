@@ -236,6 +236,41 @@ func TestCountingFilterUltraWideCounterWidth(t *testing.T) {
 	}
 }
 
+func TestCountingFilterPackedCounterWidth(t *testing.T) {
+	cf, err := NewCountingFilter(ExplicitConfig(128, 4, WithCounterWidth(4)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cf.CounterWidth() != 4 {
+		t.Fatalf("CounterWidth() = %d, want 4", cf.CounterWidth())
+	}
+	if got := cf.CounterBytes(); got != 64 {
+		t.Fatalf("CounterBytes() = %d, want 64", got)
+	}
+	if got := cf.CounterLimit(); got != 15 {
+		t.Fatalf("CounterLimit() = %d, want 15", got)
+	}
+
+	key := []byte("packed")
+	for i := 0; i < 15; i++ {
+		if err := cf.Add(key); err != nil {
+			t.Fatalf("add %d: %v", i, err)
+		}
+	}
+	if got := cf.MaxCounter(); got != 15 {
+		t.Fatalf("MaxCounter() = %d, want 15", got)
+	}
+	if err := cf.Add(key); err != ErrCounterOverflow {
+		t.Errorf("expected ErrCounterOverflow, got %v", err)
+	}
+	if !cf.Remove(key) {
+		t.Fatal("remove should succeed")
+	}
+	if !cf.Contains(key) {
+		t.Fatal("key should still appear present after one of 15 adds removed")
+	}
+}
+
 func TestCountingFilterInvalidCounterWidth(t *testing.T) {
 	_, err := NewCountingFilter(ExplicitConfig(64, 2, WithCounterWidth(24)))
 	if err != ErrInvalidCounterWidth {

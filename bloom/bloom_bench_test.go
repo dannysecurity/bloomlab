@@ -247,7 +247,32 @@ func BenchmarkCountingFilterStorageFootprint(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
-	storageBytes := cf.BitCount() // one byte per counter
+	storageBytes := cf.CounterBytes()
+	probe := []byte("key-4242")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = cf.Contains(probe)
+	}
+	b.StopTimer()
+	b.ReportMetric(float64(storageBytes)/benchItemCount, "storage-bytes/item")
+}
+
+func BenchmarkCountingFilter4BitStorageFootprint(b *testing.B) {
+	fc := TargetFilter(benchItemCount, 0.01)
+	m, k, err := fc.Size()
+	if err != nil {
+		b.Fatal(err)
+	}
+	cf, err := NewCountingFilter(ExplicitConfig(m, k, WithCounterWidth(4)))
+	if err != nil {
+		b.Fatal(err)
+	}
+	for i := 0; i < benchItemCount; i++ {
+		if err := cf.Add([]byte(fmt.Sprintf("key-%d", i))); err != nil {
+			b.Fatal(err)
+		}
+	}
+	storageBytes := cf.CounterBytes()
 	probe := []byte("key-4242")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

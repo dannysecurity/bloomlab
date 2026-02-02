@@ -10,13 +10,23 @@ func TestCounterStoreWidths(t *testing.T) {
 		name          string
 		width         uint8
 		bytesPer      uint64
+		storageBytes  uint64
 		limit         uint64
 		overflowAfter int
 	}{
 		{
+			name:          "4-bit packed",
+			width:         4,
+			bytesPer:      0,
+			storageBytes:  8,
+			limit:         15,
+			overflowAfter: 15,
+		},
+		{
 			name:          "8-bit",
 			width:         8,
 			bytesPer:      1,
+			storageBytes:  16,
 			limit:         255,
 			overflowAfter: 255,
 		},
@@ -24,6 +34,7 @@ func TestCounterStoreWidths(t *testing.T) {
 			name:          "16-bit",
 			width:         16,
 			bytesPer:      2,
+			storageBytes:  32,
 			limit:         65535,
 			overflowAfter: 65535,
 		},
@@ -31,6 +42,7 @@ func TestCounterStoreWidths(t *testing.T) {
 			name:          "32-bit",
 			width:         32,
 			bytesPer:      4,
+			storageBytes:  64,
 			limit:         4294967295,
 			overflowAfter: 0,
 		},
@@ -38,6 +50,7 @@ func TestCounterStoreWidths(t *testing.T) {
 			name:          "64-bit",
 			width:         64,
 			bytesPer:      8,
+			storageBytes:  128,
 			limit:         18446744073709551615,
 			overflowAfter: 0,
 		},
@@ -51,6 +64,9 @@ func TestCounterStoreWidths(t *testing.T) {
 			}
 			if got := store.bytesPerCounter(); got != tt.bytesPer {
 				t.Fatalf("bytesPerCounter() = %d, want %d", got, tt.bytesPer)
+			}
+			if got := store.storageBytes(); got != tt.storageBytes {
+				t.Fatalf("storageBytes() = %d, want %d", got, tt.storageBytes)
 			}
 			if got := store.limit(); got != tt.limit {
 				t.Fatalf("limit() = %d, want %d", got, tt.limit)

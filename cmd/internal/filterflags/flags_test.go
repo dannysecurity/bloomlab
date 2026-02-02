@@ -123,6 +123,22 @@ func TestFlagsConfig(t *testing.T) {
 	}
 }
 
+func TestFlagsCountingConfigPackedCounterWidth(t *testing.T) {
+	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+	f := RegisterCounting(1000)
+	if err := flag.CommandLine.Parse([]string{"-counter-width", "4"}); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := f.Config()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.CounterWidth != 4 {
+		t.Fatalf("CounterWidth = %d, want 4", cfg.CounterWidth)
+	}
+}
+
 func TestFlagsCountingConfigWideCounterWidth(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
 	f := RegisterCounting(1000)
@@ -200,6 +216,16 @@ func TestFlagsConfigTable(t *testing.T) {
 			wantErr: "unknown hash strategy",
 		},
 		{
+			name:     "counting 4-bit packed counter",
+			counting: true,
+			args:     []string{"-counter-width", "4"},
+			check: func(t *testing.T, cfg bloom.Config) {
+				if cfg.CounterWidth != 4 {
+					t.Fatalf("CounterWidth = %d, want 4", cfg.CounterWidth)
+				}
+			},
+		},
+		{
 			name:     "counting 16-bit counter",
 			counting: true,
 			args:     []string{"-counter-width", "16"},
@@ -233,7 +259,7 @@ func TestFlagsConfigTable(t *testing.T) {
 			name:     "counting invalid counter width",
 			counting: true,
 			args:     []string{"-counter-width", "24"},
-			wantErr:  "counter-width must be 8, 16, 32, or 64",
+			wantErr:  "counter-width must be 4, 8, 16, 32, or 64",
 		},
 	}
 
