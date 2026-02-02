@@ -48,6 +48,25 @@ fc := bloom.TargetFilter(10_000, 0.01,
 f, _ := bloom.NewFilterFrom(fc)
 ```
 
+For a single fluent entry point that covers sizing, hash, and counting options, use the `setup` package:
+
+```go
+import "github.com/dannysecurity/bloomlab/bloom/setup"
+
+f, _ := setup.Target(10_000, 0.01,
+	setup.WithHash(bloom.HashMurmur3),
+	setup.WithSeed(42),
+).Filter()
+
+cf, _ := setup.Target(10_000, 0.01,
+	setup.WithCounterWidth(16),
+).CountingFilter()
+
+plan, _ := setup.Target(10_000, 0.01).Plan() // theoretical m, k, and FPR
+```
+
+`setup.Builder` validates once and can produce `FilterConfig`, `CountingConfig`, or constructed filters directly. CLI tools in this repo parse flags through the same builder path via `filterflags`.
+
 The legacy `bloom.Config` type remains available for older call sites:
 
 ```go
