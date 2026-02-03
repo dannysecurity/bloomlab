@@ -153,6 +153,26 @@ func TestRunDupOnly(t *testing.T) {
 	}
 }
 
+func TestRunCountingDupOnly(t *testing.T) {
+	c := NewCountingClassifier(testCountingFilter(t), nil)
+	var out, errOut bytes.Buffer
+	in := strings.NewReader("a\nb\na\nc\na\n")
+
+	if err := RunCounting(c, in, CountingRunOptions{
+		RunOptions: RunOptions{DupOnly: true, Out: &out, ErrOut: &errOut},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	wantOut := "dup\ta\ndup\ta\n"
+	if out.String() != wantOut {
+		t.Fatalf("stdout:\n%s\nwant:\n%s", out.String(), wantOut)
+	}
+	if !strings.Contains(errOut.String(), "novel: 3, duplicates: 2") {
+		t.Fatalf("stderr summary: %q", errOut.String())
+	}
+}
+
 func TestRunJSONOutput(t *testing.T) {
 	c := NewClassifier(testFilter(t), nil)
 	var out bytes.Buffer

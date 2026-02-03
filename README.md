@@ -260,6 +260,7 @@ printf '%s\n' 'a' 'b' 'a' 'c' 'a' | go run ./cmd/streamdedup -dup-only
 printf '%s\n' 'alpha' 'beta' 'alpha' '-alpha' 'alpha' | go run ./cmd/countingdedup
 printf '%s\n' 'Alpha' 'alpha' | go run ./cmd/countingdedup -ignore-case
 printf '%s\n' 'x' 'x' '-x' 'x' | go run ./cmd/countingdedup -json
+printf '%s\n' 'a' 'b' 'a' 'c' 'a' | go run ./cmd/countingdedup -dup-only
 
 # URL stream deduper — same check-then-insert flow with optional URL canonicalization
 printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/urldedup
@@ -285,6 +286,7 @@ printf '%s\n' \
   'https://a.test/page' \
   | go run ./cmd/countingurldedup -normalize -strip-tracking
 printf '%s\n' 'https://a.test/path/' 'https://a.test/path' '-https://a.test/path' 'https://a.test/path' | go run ./cmd/countingurldedup -normalize
+printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/countingurldedup -dup-only
 
 # Sizing calculator — show m, k, fill fraction, and theory FPR for a target
 go run ./cmd/fprcalc -n 10000 -p 0.01
@@ -435,7 +437,7 @@ Sizing mode on either type: call `Mode()` for `SizingTarget` or `SizingExplicit`
 | `NewFilter(cfg)` / `NewCountingFilter(cfg)` | Legacy constructors (delegate to structured config internally) |
 | `New(n, p)` / `NewCountingFromTarget(n, p)` | Shorthand for target sizing |
 
-CLIs share filter flags via `cmd/internal/filterflags`: target sizing uses `-n`/`-p`; explicit sizing uses `-m`/`-k`. Demos and tools resolve flags through `FilterConfig()` / `CountingConfig()` and construct filters with `NewFilterFrom` / `NewCountingFilterFrom`. The legacy `Config()` helper remains for round-trip compatibility. Stream dedup tools share output flags via `cmd/internal/streamflags` (`-quiet`, `-json`, `-ignore-case`, `-novel-only`).
+CLIs share filter flags via `cmd/internal/filterflags`: target sizing uses `-n`/`-p`; explicit sizing uses `-m`/`-k`. Demos and tools resolve flags through `FilterConfig()` / `CountingConfig()` and construct filters with `NewFilterFrom` / `NewCountingFilterFrom`. The legacy `Config()` helper remains for round-trip compatibility. Stream dedup tools share output flags via `cmd/internal/streamflags` (`-quiet`, `-json`, `-ignore-case`, `-novel-only`, `-dup-only`).
 
 Target sizing uses:
 
