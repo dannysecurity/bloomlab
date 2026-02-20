@@ -189,6 +189,17 @@ go run ./cmd/fprcalc -n 10000 -p 0.01 -derive
 | Fill fraction `f` at capacity | ≈ 0.465 (46.5%) |
 | Achieved theory FPR | ≈ 0.0101 (1.01%) |
 
+#### Substituting the numbers
+
+With `m = 95,850` and `k = 6` from the table above:
+
+1. **Exponent `kn/m`:** `6 × 10,000 / 95,850 ≈ 0.6260`
+2. **Clear probability:** `P(clear) ≈ e^(-0.6260) ≈ 0.5347`
+3. **Fill fraction:** `f ≈ 1 - 0.5347 ≈ 0.4653` (46.5%)
+4. **False positive rate:** `p ≈ f^k ≈ 0.4653^6 ≈ 0.01014` (1.014%)
+
+The achieved rate is slightly above the 1% target because `k` is rounded down from the continuous optimum `k* ≈ 6.644`. `FormatSizingDerivation` and `go run ./cmd/fprcalc -n 10000 -p 0.01 -derive` print the same steps programmatically.
+
 Check with the library or CLI:
 
 ```bash
@@ -235,6 +246,30 @@ fmt.Println(f.FillRatio())  // observed fill (may differ slightly from theory)
 ```
 
 **Empirical FPR** is measured by inserting `n` distinct keys, then probing many absent keys and counting false positives: `rate = falsePositives / trials`. Tests in `bloom/fpr_empirical_test.go` assert empirical rates stay within generous bounds of theory; see also `TestFalsePositiveRate` in `bloom/bloom_test.go`.
+
+### API reference
+
+| Function | Returns |
+|----------|---------|
+| `TheoryFillFraction(n, m, k)` | Expected fill fraction `f ≈ 1 - e^(-kn/m)` |
+| `TheoryFalsePositiveRate(n, m, k)` | Theory FPR `p ≈ f^k`; 0 when `n`, `m`, or `k` is zero |
+| `ContinuousOptimalM(n, p)` | Real-valued `m` before truncation and bounds |
+| `ContinuousOptimalK(m, n)` | Real-valued `k` before rounding and caps |
+| `PlanSizing(n, p)` / `PlanSizingFromFilter(fc)` | Resolved `m`, `k`, achieved FPR, and fill at capacity |
+| `FormatSizingDerivation(plan)` | Numbered derivation text (same as `fprcalc -derive`) |
+| `FilterConfig.TheoryFPRAt(n)` | Theory FPR for a config at insert count `n` |
+| `Filter.TheoryFPR()` | Theory FPR using the filter's current insert count |
+
+### Invariants
+
+Under the independence model, theory FPR satisfies:
+
+- **Fill identity:** `TheoryFalsePositiveRate(n, m, k) = TheoryFillFraction(n, m, k)^k`
+- **Monotonic in inserts:** more distinct keys → higher FPR (for fixed `m`, `k`)
+- **Monotonic in bits:** larger `m` → lower FPR (for fixed `n`, `k`)
+- **At continuous optimum:** `k* = (m/n)·ln 2` gives `f ≈ 1/2`, hence `p ≈ (1/2)^k*`
+
+Property tests in `bloom/property_suite_test.go` validate these relationships with quick-check.
 
 ## Demo apps
 
