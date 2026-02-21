@@ -9,7 +9,7 @@ A Go toolkit for [Bloom filters](https://en.wikipedia.org/wiki/Bloom_filter): sp
 - **Benchmarks** — add, lookup, and remove throughput
 - **benchcompare** — programmatic Bloom filter vs `map[string]struct{}` comparison with CLI and Go benchmarks
 - **dedup** — check-then-insert stream dedup over standard or counting Bloom filters
-- **Demo CLIs** — `bloomdemo`, `countingdemo`, `streamdedup`, `countingdedup`, `urldedup`, `countingurldedup`, `fprcalc`, `hashtune`, and `benchcompare` for interactive exploration
+- **Demo CLIs** — `bloomdemo`, `countingdemo`, `dedupdemo`, `streamdedup`, `countingdedup`, `urldedup`, `countingurldedup`, `fprcalc`, `hashtune`, and `benchcompare` for interactive exploration
 
 ## Install
 
@@ -290,6 +290,13 @@ printf '%s\n' 'Alpha' 'alpha' | go run ./cmd/streamdedup -ignore-case
 printf '%s\n' 'log-a' 'log-b' 'log-a' | go run ./cmd/streamdedup -json
 printf '%s\n' 'a' 'b' 'a' 'c' | go run ./cmd/streamdedup -novel-only
 printf '%s\n' 'a' 'b' 'a' 'c' 'a' | go run ./cmd/streamdedup -dup-only
+go run ./cmd/streamdedup urls.txt   # optional single file argument
+
+# Interactive dedup demo — built-in samples or pass lines as arguments
+go run ./cmd/dedupdemo
+go run ./cmd/dedupdemo -sample tracking -url -normalize -strip-tracking
+go run ./cmd/dedupdemo alpha beta alpha
+go run ./cmd/dedupdemo -url -normalize 'https://Example.com/' 'http://example.com:80'
 
 # Counting stream deduper — same flow with removable keys (prefix lines with -)
 printf '%s\n' 'alpha' 'beta' 'alpha' '-alpha' 'alpha' | go run ./cmd/countingdedup
@@ -365,6 +372,8 @@ cc.Remove("session-a") // key can be seen again as novel
 ```
 
 The `countingdedup` CLI reads stdin and treats lines prefixed with `-` (override with `-remove-prefix`) as removals instead of classifications.
+
+`dedupdemo` is the quickest way to try stream or URL dedup: run with no input to execute a built-in sample (`-sample stream|url|tracking`), pass lines as arguments, or pipe stdin. The stream dedup CLIs (`streamdedup`, `urldedup`, `countingdedup`, `countingurldedup`) accept an optional single file path argument in addition to stdin.
 
 ### benchcompare subsystem
 

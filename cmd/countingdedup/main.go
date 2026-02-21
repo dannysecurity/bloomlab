@@ -33,14 +33,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	if flag.NArg() > 0 {
-		fmt.Fprintln(os.Stderr, "countingdedup: reads lines from stdin; prefix lines with -remove-prefix to drop keys")
-		fmt.Fprintln(os.Stderr, "Usage: countingdedup [flags] < lines.txt")
+	src, _, closeFn, err := dedup.OpenInput(dedup.InputModeFile, flag.Args())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "countingdedup: %v\n", err)
 		os.Exit(2)
 	}
+	defer closeFn()
 
 	c := dedup.NewCountingClassifier(cf, stream.KeyFunc())
-	if err := dedup.RunCounting(c, os.Stdin, dedup.CountingRunOptions{
+	if err := dedup.RunCounting(c, src.Reader, dedup.CountingRunOptions{
 		RunOptions:   stream.RunOptions(),
 		RemovePrefix: *removePrefix,
 	}); err != nil {

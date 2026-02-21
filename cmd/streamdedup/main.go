@@ -9,6 +9,7 @@ import (
 	"github.com/dannysecurity/bloomlab/cmd/internal/filterflags"
 	"github.com/dannysecurity/bloomlab/cmd/internal/streamdedup"
 	"github.com/dannysecurity/bloomlab/cmd/internal/streamflags"
+	"github.com/dannysecurity/bloomlab/dedup"
 )
 
 func main() {
@@ -32,14 +33,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	if flag.NArg() > 0 {
-		fmt.Fprintln(os.Stderr, "streamdedup: reads lines from stdin; flags configure the Bloom filter")
-		fmt.Fprintln(os.Stderr, "Usage: streamdedup [flags] < lines.txt")
+	src, _, closeFn, err := dedup.OpenInput(dedup.InputModeFile, flag.Args())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "streamdedup: %v\n", err)
 		os.Exit(2)
 	}
+	defer closeFn()
 
 	d := streamdedup.New(f, stream.KeyFunc())
-	if err := streamdedup.Run(d, os.Stdin, streamdedup.RunOptions(stream.RunOptions())); err != nil {
+	if err := streamdedup.Run(d, src.Reader, streamdedup.RunOptions(stream.RunOptions())); err != nil {
 		fmt.Fprintf(os.Stderr, "streamdedup: %v\n", err)
 		os.Exit(1)
 	}
