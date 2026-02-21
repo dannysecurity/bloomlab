@@ -3,6 +3,7 @@ package bloom
 import "fmt"
 
 const (
+	counterMax2  = uint8(3)
 	counterMax4  = uint8(15)
 	counterMax8  = uint8(255)
 	counterMax16 = uint16(65535)
@@ -77,6 +78,81 @@ func (s counterStore8) bytesPerCounter() uint64 { return 1 }
 func (s counterStore8) storageBytes() uint64 { return uint64(len(s.counters)) }
 
 func (s counterStore8) limit() uint64 { return uint64(counterMax8) }
+
+type counterStore2 struct {
+	m    uint64
+	data []byte // four 2-bit counters per byte
+}
+
+func newCounterStore2(m uint64) counterStore2 {
+	return counterStore2{m: m, data: make([]byte, (m+3)/4)}
+}
+
+func twoBitSlot(idx uint64) (byteIdx uint64, shift uint) {
+	slot := idx % 4
+	return idx / 4, uint(slot * 2)
+}
+
+func (s counterStore2) readCounter(idx uint64) uint8 {
+	byteIdx, shift := twoBitSlot(idx)
+	return (s.data[byteIdx] >> shift) & 0x03
+}
+
+func (s counterStore2) writeCounter(idx uint64, val uint8) {
+	byteIdx, shift := twoBitSlot(idx)
+	mask := byte(0x03 << shift)
+	s.data[byteIdx] = (s.data[byteIdx] &^ mask) | ((val & 0x03) << shift)
+}
+
+func (s counterStore2) at(idx uint64) uint64 { return uint64(s.readCounter(idx)) }
+
+func (s counterStore2) inc(idx uint64) error {
+	v := s.readCounter(idx)
+	if v == counterMax2 {
+		return ErrCounterOverflow
+	}
+	s.writeCounter(idx, v+1)
+	return nil
+}
+
+func (s counterStore2) dec(idx uint64) {
+	v := s.readCounter(idx)
+	if v > 0 {
+		s.writeCounter(idx, v-1)
+	}
+}
+
+func (s counterStore2) clear() {
+	for i := range s.data {
+		s.data[i] = 0
+	}
+}
+
+func (s counterStore2) max() uint64 {
+	var max uint64
+	for idx := uint64(0); idx < s.m; idx++ {
+		if v := uint64(s.readCounter(idx)); v > max {
+			max = v
+		}
+	}
+	return max
+}
+
+func (s counterStore2) occupied() uint64 {
+	var occupied uint64
+	for idx := uint64(0); idx < s.m; idx++ {
+		if s.readCounter(idx) > 0 {
+			occupied++
+		}
+	}
+	return occupied
+}
+
+func (s counterStore2) bytesPerCounter() uint64 { return 0 }
+
+func (s counterStore2) storageBytes() uint64 { return uint64(len(s.data)) }
+
+func (s counterStore2) limit() uint64 { return uint64(counterMax2) }
 
 type counterStore4 struct {
 	m    uint64
@@ -328,6 +404,8 @@ func (s counterStore64) limit() uint64 { return counterMax64 }
 
 func newCounterStore(m uint64, width uint8) (counterStore, error) {
 	switch width {
+	case 2:
+		return newCounterStore2(m), nil
 	case 4:
 		return newCounterStore4(m), nil
 	case 8:

@@ -41,7 +41,7 @@ func Register(defaultCapacity uint64) *Flags {
 // RegisterCounting binds the standard flags plus -counter-width for counting filters.
 func RegisterCounting(defaultCapacity uint64) *Flags {
 	f := Register(defaultCapacity)
-	f.CounterWidth = flag.Uint("counter-width", 8, "per-bit counter width in bits: 4, 8, 16, 32, or 64")
+	f.CounterWidth = flag.Uint("counter-width", 8, "per-bit counter width in bits: 2, 4, 8, 16, 32, or 64")
 	return f
 }
 
@@ -64,10 +64,10 @@ func (f *Flags) CountingConfig() (bloom.CountingConfig, error) {
 	if f.CounterWidth != nil {
 		switch *f.CounterWidth {
 		case 8:
-		case 4, 16, 32, 64:
+		case 2, 4, 16, 32, 64:
 			b = b.Apply(setup.WithCounterWidth(uint8(*f.CounterWidth)))
 		default:
-			return bloom.CountingConfig{}, fmt.Errorf("counter-width must be 4, 8, 16, 32, or 64")
+			return bloom.CountingConfig{}, fmt.Errorf("counter-width must be 2, 4, 8, 16, 32, or 64")
 		}
 	}
 	return b.CountingConfig()
@@ -83,10 +83,10 @@ func (f *Flags) Config() (bloom.Config, error) {
 	cfg := fc.Config()
 	if f.CounterWidth != nil && *f.CounterWidth != 8 {
 		switch *f.CounterWidth {
-		case 4, 16, 32, 64:
+		case 2, 4, 16, 32, 64:
 			cfg.CounterWidth = uint8(*f.CounterWidth)
 		default:
-			return bloom.Config{}, fmt.Errorf("counter-width must be 4, 8, 16, 32, or 64")
+			return bloom.Config{}, fmt.Errorf("counter-width must be 2, 4, 8, 16, 32, or 64")
 		}
 	}
 	return cfg, nil
@@ -112,10 +112,10 @@ func (f *Flags) ConfigOptions() ([]bloom.ConfigOption, error) {
 	if f.CounterWidth != nil {
 		switch *f.CounterWidth {
 		case 8:
-		case 4, 16, 32, 64:
+		case 2, 4, 16, 32, 64:
 			opts = append(opts, bloom.WithCounterWidth(uint8(*f.CounterWidth)))
 		default:
-			return nil, fmt.Errorf("counter-width must be 4, 8, 16, 32, or 64")
+			return nil, fmt.Errorf("counter-width must be 2, 4, 8, 16, 32, or 64")
 		}
 	}
 	return opts, nil

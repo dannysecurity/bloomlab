@@ -5,8 +5,9 @@ import "errors"
 var ErrCounterOverflow = errors.New("bloom: counter overflow")
 
 // CountingFilter supports deletion by tracking per-bit counters instead of bits.
-// Counters default to uint8; use WithCounterWidth(4) for a packed half-byte variant
-// when per-position duplicate counts stay at or below 15, or WithCounterWidth(16),
+// Counters default to uint8; use WithCounterWidth(2) for a packed quarter-byte variant
+// when per-position duplicate counts stay at or below 3, WithCounterWidth(4) for a
+// packed half-byte variant when counts stay at or below 15, or WithCounterWidth(16),
 // WithCounterWidth(32), or WithCounterWidth(64) for wider variants that tolerate
 // more duplicate inserts before ErrCounterOverflow.
 type CountingFilter struct {
@@ -56,11 +57,11 @@ func NewCountingFromTarget(expectedCapacity uint64, falsePositiveRate float64) (
 	return NewCountingFilter(TargetConfig(expectedCapacity, falsePositiveRate))
 }
 
-// CounterWidth returns the per-bit counter width in bits (4, 8, 16, 32, or 64).
+// CounterWidth returns the per-bit counter width in bits (2, 4, 8, 16, 32, or 64).
 func (cf *CountingFilter) CounterWidth() uint8 { return cf.width }
 
 // CounterLimit returns the maximum value a single counter can hold before Add
-// returns ErrCounterOverflow (15 for 4-bit packed, 255 for 8-bit, 65535 for 16-bit,
+// returns ErrCounterOverflow (3 for 2-bit packed, 15 for 4-bit packed, 255 for 8-bit, 65535 for 16-bit,
 // 4294967295 for 32-bit, 18446744073709551615 for 64-bit).
 func (cf *CountingFilter) CounterLimit() uint64 {
 	return cf.store.limit()

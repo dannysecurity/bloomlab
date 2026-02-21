@@ -15,6 +15,14 @@ func TestCounterStoreWidths(t *testing.T) {
 		overflowAfter int
 	}{
 		{
+			name:          "2-bit packed",
+			width:         2,
+			bytesPer:      0,
+			storageBytes:  4,
+			limit:         3,
+			overflowAfter: 3,
+		},
+		{
 			name:          "4-bit packed",
 			width:         4,
 			bytesPer:      0,

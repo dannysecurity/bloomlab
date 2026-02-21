@@ -44,7 +44,7 @@ func WithSizingBounds(bounds bloom.SizingBounds) Option {
 	}
 }
 
-// WithCounterWidth selects per-bit counter width for counting filters (4, 8, 16, 32, or 64).
+// WithCounterWidth selects per-bit counter width for counting filters (2, 4, 8, 16, 32, or 64).
 func WithCounterWidth(width uint8) Option {
 	return func(b *Builder) {
 		b.counterWidth = width

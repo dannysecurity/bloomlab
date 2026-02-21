@@ -5,7 +5,7 @@ A Go toolkit for [Bloom filters](https://en.wikipedia.org/wiki/Bloom_filter): sp
 ## Features
 
 - **Standard Bloom filter** (`bloom.Filter`) — fixed-size bit array, optimal `m` and `k` from target capacity and FPR
-- **Counting Bloom filter** (`bloom.CountingFilter`) — supports deletion via per-bit counters; optional 4-bit packed storage halves counter memory when duplicate counts stay ≤15
+- **Counting Bloom filter** (`bloom.CountingFilter`) — supports deletion via per-bit counters; optional 2-bit or 4-bit packed storage reduces counter memory when duplicate counts stay small
 - **Benchmarks** — add, lookup, and remove throughput
 - **benchcompare** — programmatic Bloom filter vs `map[string]struct{}` comparison with CLI and Go benchmarks
 - **dedup** — check-then-insert stream dedup over standard or counting Bloom filters
@@ -95,6 +95,13 @@ For fixed sizing, use explicit configuration:
 
 ```go
 cf, _ := bloom.NewCountingFilterFrom(bloom.ExplicitCounting(1024, 4))
+```
+
+Use 2-bit packed counters when per-position duplicate counts stay at or below 3 — counter storage uses a quarter byte per bit position:
+
+```go
+cf, _ := bloom.NewCountingFilterFrom(bloom.ExplicitCounting(1024, 4, bloom.WithCountingCounterWidth(2)))
+fmt.Println(cf.CounterBytes()) // (m+3)/4 bytes instead of m
 ```
 
 Use 4-bit packed counters when per-position duplicate counts stay at or below 15 — counter storage uses half a byte per bit position instead of one byte:
@@ -459,7 +466,7 @@ go test -bench=ReportMetrics ./benchcompare/
 | Type | Add | Contains | Remove | Notes |
 |------|-----|----------|--------|-------|
 | `Filter` | ✓ | ✓ | — | Classic bit-slice Bloom filter |
-| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters by default; `WithCounterWidth(4\|16\|32\|64)` for packed or wider variants; overflow at counter max; `Clear`, `CounterBytes`, `CounterWidth`, `ApproximateCount`, `TheoryFPR`, `FillRatio` |
+| `CountingFilter` | ✓ | ✓ | ✓ | 8-bit counters by default; `WithCounterWidth(2\|4\|16\|32\|64)` for packed or wider variants; overflow at counter max; `Clear`, `CounterBytes`, `CounterWidth`, `ApproximateCount`, `TheoryFPR`, `FillRatio` |
 
 ### Configuration
 

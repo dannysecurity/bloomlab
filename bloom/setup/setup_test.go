@@ -57,6 +57,16 @@ func TestCountingConfig(t *testing.T) {
 	}
 }
 
+func TestCountingConfig2Bit(t *testing.T) {
+	cc, err := setup.Explicit(512, 3, setup.WithCounterWidth(2)).CountingConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cc.CounterWidth != 2 {
+		t.Fatalf("CounterWidth = %d, want 2", cc.CounterWidth)
+	}
+}
+
 func TestCountingConfig4Bit(t *testing.T) {
 	cc, err := setup.Explicit(512, 3, setup.WithCounterWidth(4)).CountingConfig()
 	if err != nil {

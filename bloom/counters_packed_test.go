@@ -2,6 +2,65 @@ package bloom
 
 import "testing"
 
+func TestCounterStore2PackedCounters(t *testing.T) {
+	store, err := newCounterStore(5, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := store.(counterStore2)
+
+	// Odd m leaves unused 2-bit slots in the last byte.
+	if got := s.storageBytes(); got != 2 {
+		t.Fatalf("storageBytes() = %d, want 2", got)
+	}
+
+	for idx := uint64(0); idx < 5; idx++ {
+		if err := store.inc(idx); err != nil {
+			t.Fatalf("inc(%d): %v", idx, err)
+		}
+	}
+	if got := store.occupied(); got != 5 {
+		t.Fatalf("occupied() = %d, want 5", got)
+	}
+	if got := s.readCounter(4); got != 1 {
+		t.Fatalf("counter 4 = %d, want 1", got)
+	}
+	if got := s.readCounter(5); got != 0 {
+		t.Fatalf("unused slot = %d, want 0", got)
+	}
+
+	store.clear()
+	if got := store.max(); got != 0 {
+		t.Fatalf("after clear max() = %d, want 0", got)
+	}
+}
+
+func TestCounterStore2AdjacentCountersIndependent(t *testing.T) {
+	store, err := newCounterStore(4, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 3; i++ {
+		if err := store.inc(0); err != nil {
+			t.Fatalf("inc slot 0 iteration %d: %v", i, err)
+		}
+	}
+	if err := store.inc(0); err != ErrCounterOverflow {
+		t.Fatalf("expected overflow on slot 0, got %v", err)
+	}
+	if got := store.at(1); got != 0 {
+		t.Fatalf("adjacent slot changed: at(1) = %d, want 0", got)
+	}
+
+	if err := store.inc(1); err != nil {
+		t.Fatal(err)
+	}
+	if got := store.at(0); got != 3 {
+		t.Fatalf("overflow on slot 1 changed slot 0: at(0) = %d, want 3", got)
+	}
+}
+
 func TestCounterStore4PackedNibbles(t *testing.T) {
 	store, err := newCounterStore(5, 4)
 	if err != nil {

@@ -216,6 +216,16 @@ func TestFlagsConfigTable(t *testing.T) {
 			wantErr: "unknown hash strategy",
 		},
 		{
+			name:     "counting 2-bit packed counter",
+			counting: true,
+			args:     []string{"-counter-width", "2"},
+			check: func(t *testing.T, cfg bloom.Config) {
+				if cfg.CounterWidth != 2 {
+					t.Fatalf("CounterWidth = %d, want 2", cfg.CounterWidth)
+				}
+			},
+		},
+		{
 			name:     "counting 4-bit packed counter",
 			counting: true,
 			args:     []string{"-counter-width", "4"},
@@ -259,7 +269,7 @@ func TestFlagsConfigTable(t *testing.T) {
 			name:     "counting invalid counter width",
 			counting: true,
 			args:     []string{"-counter-width", "24"},
-			wantErr:  "counter-width must be 4, 8, 16, 32, or 64",
+			wantErr:  "counter-width must be 2, 4, 8, 16, 32, or 64",
 		},
 	}
 
