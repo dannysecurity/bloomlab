@@ -138,6 +138,26 @@ Equivalently, let `f ≈ 1 - e^(-kn/m)` be the **fill fraction** (expected share
 
 There are no false negatives: if a key was inserted, `Contains` always returns true.
 
+### Formula reference
+
+| Symbol | Meaning |
+|--------|---------|
+| `n` | Distinct keys inserted |
+| `m` | Bit array length |
+| `k` | Hash functions (probes per key) |
+| `f` | Fill fraction — expected share of bits set to 1 |
+| `p` | False positive rate on absent keys |
+
+| Formula | Role |
+|---------|------|
+| `f ≈ 1 - e^(-kn/m)` | Fill after `n` distinct inserts (`TheoryFillFraction`) |
+| `p ≈ f^k = (1 - e^(-kn/m))^k` | FPR at insert count `n` (`TheoryFalsePositiveRate`) |
+| `m = -n·ln(p) / (ln 2)²` | Optimal bits for target capacity and FPR |
+| `k ≈ round((m/n)·ln 2)` | Hash count at the continuous optimum |
+| `m/n ≈ -ln(p) / (ln 2)²` | Bits per item — depends on `p` only, not `n` |
+
+At the continuous optimum, `kn/m = ln 2` so `f ≈ 1/2` and `p ≈ (1/2)^k`. For `p = 0.01`, the space formula gives `m/n ≈ 9.59` bits/item.
+
 ### Derivation (step by step)
 
 1. **One bit stays clear.** Each insert touches `k` of `m` bits. Under independence, the probability a given bit is *not* set by one insert is `(1 - 1/m)^k ≈ e^(-k/m)`.
@@ -218,6 +238,14 @@ Probe FPR after a different insert count without rebuilding sizing:
 ```bash
 go run ./cmd/fprcalc -n 10000 -p 0.01 -at 15000
 ```
+
+Sizing fixes `m` and `k` from the target capacity; inserting more distinct keys than planned raises fill and FPR. With the same `m = 95,850` and `k = 6` but `n = 15,000`:
+
+1. **Exponent `kn/m`:** `6 × 15,000 / 95,850 ≈ 0.9390`
+2. **Fill fraction:** `f ≈ 1 - e^(-0.9390) ≈ 0.609` (60.9%)
+3. **False positive rate:** `p ≈ 0.609^6 ≈ 0.0510` (5.10%)
+
+The filter is sized for 10k keys at 1% FPR; at 15k inserts the theoretical rate is roughly five times higher. `Filter.TheoryFPR()` tracks this as keys are added — use `-at` or `TheoryFPRAt(n)` to preview overload before construction.
 
 ### Theory vs. practice
 
@@ -332,9 +360,8 @@ printf '%s\n' 'https://a.test' 'https://b.test' 'https://a.test' | go run ./cmd/
 
 # Sizing calculator — show m, k, fill fraction, and theory FPR for a target
 go run ./cmd/fprcalc -n 10000 -p 0.01
-go run ./cmd/fprcalc -n 10000 -p 0.01
 go run ./cmd/fprcalc -n 10000 -p 0.01 -derive   # step-by-step FPR math
-go run ./cmd/fprcalc -n 5000 -p 0.001 -at 7500
+go run ./cmd/fprcalc -n 5000 -p 0.001 -at 7500   # FPR when insert count exceeds capacity
 ```
 
 ## Tests & benchmarks
