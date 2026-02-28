@@ -19,7 +19,7 @@ go get github.com/dannysecurity/bloomlab
 
 ## Quick start
 
-Configuration is expressed through `bloom.FilterConfig`, which separates sizing from hashing. Hash settings do not affect `m` or `k`:
+Configuration is expressed through `bloom.FilterConfig`, which separates sizing from hashing. Hash settings do not affect `m` or `k`. Target `p` is the desired false-positive rate on absent keys — see [False positive rate](#false-positive-rate) for formulas, a numeric walkthrough, and CLI helpers.
 
 ```go
 package main
@@ -164,6 +164,19 @@ There are no false negatives: if a key was inserted, `Contains` always returns t
 | `m/n ≈ -ln(p) / (ln 2)²` | Bits per item — depends on `p` only, not `n` |
 
 At the continuous optimum, `kn/m = ln 2` so `f ≈ 1/2` and `p ≈ (1/2)^k`. For `p = 0.01`, the space formula gives `m/n ≈ 9.59` bits/item.
+
+#### Common target lookup
+
+The bits-per-item ratio depends on `p` only (`m/n ≈ -ln(p) / (ln 2)²`). At the continuous optimum, `k* ≈ (m/n)·ln 2` and the fill fraction is `f ≈ 1/2`. Truncating `m` and rounding `k` down shifts `f` below 0.5 and can nudge achieved FPR slightly above the target.
+
+| Target `p` | Continuous `m/n` | Continuous `k*` | Resolved `k` | Achieved FPR at `n = 10_000` |
+|------------|------------------|-----------------|--------------|------------------------------|
+| 0.001 (0.1%) | ≈ 14.38 | ≈ 9.97 | 9 | ≈ 0.00102 |
+| 0.01 (1%) | ≈ 9.59 | ≈ 6.64 | 6 | ≈ 0.01014 |
+| 0.05 (5%) | ≈ 6.24 | ≈ 4.33 | 4 | ≈ 0.05027 |
+| 0.10 (10%) | ≈ 4.79 | ≈ 3.32 | 3 | ≈ 0.10071 |
+
+Resolved columns come from `PlanSizing(10_000, p)` with default bounds. For other capacities, scale `m` linearly with `n` and re-check with `go run ./cmd/fprcalc -n <capacity> -p <rate>`.
 
 ### Derivation (step by step)
 
