@@ -73,9 +73,12 @@ func main() {
 		if len(report.Candidates) > 0 {
 			best := report.Candidates[0]
 			report.Best = bloom.StrategyScore{
-				Strategy: strategy,
-				Seed:     best.Seed,
-				Spread:   best.Spread,
+				Strategy:    strategy,
+				Seed:        best.Seed,
+				Spread:      best.Spread,
+				Overlap:     best.Overlap,
+				Stride:      best.Stride,
+				Correlation: best.Correlation,
 			}
 		}
 		printReport(report, *markdown)

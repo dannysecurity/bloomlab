@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestTuneSeedPicksLowerChiSquared(t *testing.T) {
+func TestTuneSeedPicksLowestScore(t *testing.T) {
 	opts := TuneOptions{
 		M:       2048,
 		K:       6,
@@ -25,8 +25,13 @@ func TestTuneSeedPicksLowerChiSquared(t *testing.T) {
 	if best.Seed != ranked[0].Seed {
 		t.Fatalf("TuneSeed picked seed %d, CompareSeeds best is %d", best.Seed, ranked[0].Seed)
 	}
-	if best.ChiSquared != ranked[0].ChiSquared {
-		t.Fatalf("chi-squared mismatch: %f vs %f", best.ChiSquared, ranked[0].ChiSquared)
+	if best.Score != ranked[0].Score {
+		t.Fatalf("score mismatch: %f vs %f", best.Score, ranked[0].Score)
+	}
+	for i := 1; i < len(ranked); i++ {
+		if ranked[i].Score < ranked[i-1].Score {
+			t.Fatalf("CompareSeeds not sorted by score at index %d", i)
+		}
 	}
 }
 
@@ -153,6 +158,9 @@ func TestFormatTuningReport(t *testing.T) {
 	text := FormatTuningReport(report)
 	if !strings.Contains(text, "Recommended: -hash") {
 		t.Fatal("report missing recommendation line")
+	}
+	if !strings.Contains(text, "Seed ranking") {
+		t.Fatal("report missing seed ranking table")
 	}
 	if !strings.Contains(text, "murmur3") || !strings.Contains(text, "xxhash") {
 		t.Fatal("report missing strategy rows")

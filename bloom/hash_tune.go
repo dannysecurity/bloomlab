@@ -28,11 +28,16 @@ type TuneOptions struct {
 	ChiMargin float64
 }
 
-// SeedCandidate scores a single seed for bucket uniformity under double hashing.
+// SeedCandidate scores a single seed under double hashing using bucket spread,
+// probe overlap, stride health, and h1/h2 correlation.
 type SeedCandidate struct {
-	Seed       uint64
-	Spread     BucketSpread
-	ChiSquared float64
+	Seed        uint64
+	Spread      BucketSpread
+	Overlap     ProbeOverlap
+	Stride      DoubleHashStride
+	Correlation H1H2Correlation
+	ChiSquared  float64
+	Score       float64
 }
 
 // StrategyScore ranks a hash strategy (optionally with a tuned seed).
@@ -60,34 +65,32 @@ func DefaultTuneSeeds() []uint64 {
 	return []uint64{0, 1, 7, 42, 0xdeadbeef, 0xcafebabe, 0x9e3779b97f4a7c15}
 }
 
-// TuneSeed evaluates candidate seeds for a strategy and returns the lowest chi-squared pick.
+// TuneSeed evaluates candidate seeds for a strategy and returns the lowest composite score.
 func TuneSeed(strategy Strategy, opts TuneOptions, seeds []uint64) SeedCandidate {
 	if len(seeds) == 0 {
 		seeds = DefaultTuneSeeds()
 	}
-	best := SeedCandidate{Seed: seeds[0], ChiSquared: math.MaxFloat64}
+	best := SeedCandidate{Seed: seeds[0], Score: math.MaxFloat64}
 	for _, seed := range seeds {
-		spread := MeasureBucketSpread(NewHasher(strategy, seed), opts.M, opts.K, opts.Samples, opts.KeyFor)
-		candidate := SeedCandidate{Seed: seed, Spread: spread, ChiSquared: spread.ChiSquared}
-		if candidate.ChiSquared < best.ChiSquared {
+		candidate := evaluateSeedCandidate(strategy, seed, opts)
+		if candidate.Score < best.Score {
 			best = candidate
 		}
 	}
 	return best
 }
 
-// CompareSeeds ranks every candidate seed for a strategy by chi-squared (lower is better).
+// CompareSeeds ranks every candidate seed for a strategy by composite score (lower is better).
 func CompareSeeds(strategy Strategy, opts TuneOptions, seeds []uint64) []SeedCandidate {
 	if len(seeds) == 0 {
 		seeds = DefaultTuneSeeds()
 	}
 	out := make([]SeedCandidate, 0, len(seeds))
 	for _, seed := range seeds {
-		spread := MeasureBucketSpread(NewHasher(strategy, seed), opts.M, opts.K, opts.Samples, opts.KeyFor)
-		out = append(out, SeedCandidate{Seed: seed, Spread: spread, ChiSquared: spread.ChiSquared})
+		out = append(out, evaluateSeedCandidate(strategy, seed, opts))
 	}
 	for i := 1; i < len(out); i++ {
-		for j := i; j > 0 && out[j].ChiSquared < out[j-1].ChiSquared; j-- {
+		for j := i; j > 0 && out[j].Score < out[j-1].Score; j-- {
 			out[j], out[j-1] = out[j-1], out[j]
 		}
 	}
@@ -250,10 +253,23 @@ func FormatTuningReport(report TuningReport) string {
 		tw.Flush()
 	}
 
+	if len(report.Candidates) > 1 {
+		fmt.Fprintln(&b, "\nSeed ranking (lower score is better):")
+		tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(tw, "SEED\tSCORE\tCHI²\tOVERLAP%\tGCD%\t|R|")
+		for _, candidate := range report.Candidates {
+			fmt.Fprintf(tw, "%d\t%.1f\t%.1f\t%.2f\t%.2f\t%.3f\n",
+				candidate.Seed, candidate.Score, candidate.ChiSquared,
+				candidate.Overlap.OverlapRate*100, candidate.Stride.GCDgtOneRate*100,
+				absFloat(candidate.Correlation.Pearson))
+		}
+		tw.Flush()
+	}
+
 	if len(report.Candidates) > 0 && len(report.Strategies) > 0 {
 		best := report.Candidates[0]
-		fmt.Fprintf(&b, "\nBest seed for %s: %d (chi²=%.1f)\n",
-			report.Strategies[0].Strategy, best.Seed, best.ChiSquared)
+		fmt.Fprintf(&b, "\nBest seed for %s: %d (score=%.1f, chi²=%.1f)\n",
+			report.Strategies[0].Strategy, best.Seed, best.Score, best.ChiSquared)
 	}
 
 	best := report.Best
