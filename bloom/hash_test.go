@@ -22,6 +22,8 @@ func TestParseStrategy(t *testing.T) {
 		{"wy", HashWyhash},
 		{"highway", HashHighway},
 		{"hwy", HashHighway},
+		{"siphash", HashSipHash},
+		{"sip", HashSipHash},
 	}
 	for _, tt := range tests {
 		got, err := ParseStrategy(tt.in)
@@ -74,7 +76,7 @@ func TestHasherDeterministic(t *testing.T) {
 
 func TestHasherSeedAffectsOutput(t *testing.T) {
 	key := []byte("seed-sensitivity")
-	for _, strategy := range []Strategy{HashMurmur3, HashXXHash, HashWyhash, HashHighway} {
+	for _, strategy := range []Strategy{HashMurmur3, HashXXHash, HashWyhash, HashHighway, HashSipHash} {
 		t.Run(strategy.String(), func(t *testing.T) {
 			a1, a2 := NewHasher(strategy, 0).Derive(key)
 			b1, b2 := NewHasher(strategy, 99).Derive(key)
@@ -165,6 +167,28 @@ func TestHighwayHashGoldenVectors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {
 			h1, h2 := NewHasher(HashHighway, tt.seed).Derive([]byte(tt.key))
+			if h1 != tt.h1 || h2 != tt.h2 {
+				t.Fatalf("Derive(%q, %d) = (%#x, %#x), want (%#x, %#x)",
+					tt.key, tt.seed, h1, h2, tt.h1, tt.h2)
+			}
+		})
+	}
+}
+
+func TestSipHashGoldenVectors(t *testing.T) {
+	tests := []struct {
+		key  string
+		seed uint64
+		h1   uint64
+		h2   uint64
+	}{
+		{"", 0, 0xfa1df9926549a886, 0xc6daa92a49072279},
+		{"alpha", 0, 0xa674498c991740a1, 0x12d94341820116a4},
+		{"alpha", 42, 0xb6509b790450f9f9, 0x5bc8afa042a499e9},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			h1, h2 := NewHasher(HashSipHash, tt.seed).Derive([]byte(tt.key))
 			if h1 != tt.h1 || h2 != tt.h2 {
 				t.Fatalf("Derive(%q, %d) = (%#x, %#x), want (%#x, %#x)",
 					tt.key, tt.seed, h1, h2, tt.h1, tt.h2)

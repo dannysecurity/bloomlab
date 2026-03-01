@@ -548,6 +548,7 @@ Bit positions use **double hashing**: `h(i) = (h1 + i·h2) mod m`. Hash settings
 | `HashXXHash` | `xxhash` | Single-pass xxHash-128-style derivation |
 | `HashWyhash` | `wyhash` | wyhash single-pass paired-state derivation |
 | `HashHighway` | `highway` | HighwayHash-128 single-pass derivation (seed-sensitive; keyed PRF) |
+| `HashSipHash` | `siphash` | SipHash-2-4 single-pass paired-state derivation (seed-sensitive) |
 
 ```go
 f, _ := bloom.NewFilter(bloom.TargetConfig(10_000, 0.01,
@@ -607,7 +608,7 @@ go run ./cmd/hashtune -n 10000 -p 0.01 -expand-seeds 3 -seeds 0,42
 
 When `m` is a power of two, indexing uses a bitmask fast path instead of modulo. Changing strategy or seed changes bit positions — filters are not interoperable across hash settings.
 
-Demo CLIs accept `-hash fnv|murmur3|xxhash|wyhash|highway` and `-seed <uint64>`.
+Demo CLIs accept `-hash fnv|murmur3|xxhash|wyhash|highway|siphash` and `-seed <uint64>`.
 
 ## License
 

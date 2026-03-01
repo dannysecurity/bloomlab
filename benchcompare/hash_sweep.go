@@ -15,6 +15,7 @@ var DefaultHashSweepStrategies = []bloom.Strategy{
 	bloom.HashXXHash,
 	bloom.HashWyhash,
 	bloom.HashHighway,
+	bloom.HashSipHash,
 }
 
 // CompareHashSweep runs the add scenario for each hash strategy and returns one
