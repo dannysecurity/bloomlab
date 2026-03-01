@@ -602,6 +602,7 @@ The `hashtune` CLI compares strategies and seeds for a target layout. Use `-key-
 go run ./cmd/hashtune -n 50000 -p 0.01 -key-dist url
 go run ./cmd/hashtune -n 10000 -key-file sample-urls.txt -samples 5000
 go run ./cmd/hashtune -strategy murmur3 -key-dist uuid -seeds 0,42,0xdeadbeef
+go run ./cmd/hashtune -n 10000 -p 0.01 -expand-seeds 3 -seeds 0,42
 ```
 
 When `m` is a power of two, indexing uses a bitmask fast path instead of modulo. Changing strategy or seed changes bit positions — filters are not interoperable across hash settings.

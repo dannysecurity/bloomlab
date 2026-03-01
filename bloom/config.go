@@ -231,17 +231,14 @@ func (c Config) WithRecommendedHash(rec RecommendedHashOptions) (Config, error) 
 	}
 	opts.PreferSpeed = rec.PreferSpeed
 	opts.ChiMargin = rec.ChiMargin
+	opts.ExpandSeeds = rec.ExpandSeeds
 
 	strategies := rec.Strategies
 	if len(strategies) == 0 {
 		strategies = AllStrategies()
 	}
-	seeds := rec.Seeds
-	if len(seeds) == 0 {
-		seeds = DefaultTuneSeeds()
-	}
 
-	report := RecommendHasher(opts, strategies, seeds)
+	report := RecommendHasher(opts, strategies, rec.Seeds)
 	c.Hash = report.BestHashConfig()
 	return c, nil
 }

@@ -16,6 +16,7 @@ func main() {
 	keyDist := flag.String("key-dist", "sequential", "probe key shape: sequential, url, uuid, fixed32, or samples")
 	keyFile := flag.String("key-file", "", "read probe keys from file (one per line; implies -key-dist samples)")
 	seedsRaw := flag.String("seeds", "", "comma-separated candidate seeds (default: built-in ladder)")
+	expandSeeds := flag.Int("expand-seeds", 0, "splitMix64 neighbors to add per candidate seed during tuning")
 	hashValues := flag.String("hash-values", "", "comma-separated hash strategies (default: all)")
 	strategyOnly := flag.String("strategy", "", "tune seeds for one strategy only (skip cross-strategy comparison)")
 	preferSpeed := flag.Bool("prefer-speed", false, "pick fastest Derive among strategies within chi² margin")
@@ -52,14 +53,12 @@ func main() {
 	}
 	opts.PreferSpeed = *preferSpeed
 	opts.ChiMargin = *chiMargin
+	opts.ExpandSeeds = *expandSeeds
 
 	seeds, err := bloom.ParseSeeds(*seedsRaw)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "hashtune: %v\n", err)
 		os.Exit(1)
-	}
-	if len(seeds) == 0 {
-		seeds = bloom.DefaultTuneSeeds()
 	}
 
 	if *strategyOnly != "" {
@@ -69,7 +68,7 @@ func main() {
 			os.Exit(1)
 		}
 		report := bloom.TuningReport{Options: opts}
-		report.Candidates = bloom.CompareSeeds(strategy, opts, seeds)
+		report.Candidates = bloom.CompareSeeds(strategy, opts, bloom.ResolveTuneSeeds(seeds, opts.ExpandSeeds))
 		if len(report.Candidates) > 0 {
 			best := report.Candidates[0]
 			report.Best = bloom.StrategyScore{

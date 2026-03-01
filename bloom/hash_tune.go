@@ -26,6 +26,9 @@ type TuneOptions struct {
 	// ChiMargin is the maximum chi-squared ratio (candidate/best) allowed when
 	// PreferSpeed is set. Values <= 0 default to 1.15 (15% above best).
 	ChiMargin float64
+	// ExpandSeeds adds splitMix64-derived neighbors for each candidate seed.
+	// Zero leaves the seed list unchanged (aside from DefaultTuneSeeds fallback).
+	ExpandSeeds int
 }
 
 // SeedCandidate scores a single seed under double hashing using bucket spread,
@@ -183,6 +186,8 @@ type RecommendedHashOptions struct {
 	PreferSpeed bool
 	// ChiMargin is the chi² ratio cap when PreferSpeed is set (default 1.15).
 	ChiMargin float64
+	// ExpandSeeds adds splitMix64-derived neighbors per base seed during tuning.
+	ExpandSeeds int
 }
 
 // ParseSeeds parses comma-separated decimal or 0x-prefixed hex seeds.
@@ -325,9 +330,7 @@ func RecommendHasher(opts TuneOptions, strategies []Strategy, seeds []uint64) Tu
 	if len(strategies) == 0 {
 		strategies = AllStrategies()
 	}
-	if len(seeds) == 0 {
-		seeds = DefaultTuneSeeds()
-	}
+	seeds = ResolveTuneSeeds(seeds, opts.ExpandSeeds)
 
 	report := TuningReport{Options: opts}
 	report.Candidates = CompareSeeds(strategies[0], opts, seeds)
